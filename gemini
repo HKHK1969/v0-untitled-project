@@ -1,0 +1,2132 @@
+/******************************************************************************
+ * APPAREL SUPPLY CHAIN TRACKER - IMPROVED CONSOLIDATED CODE (v1)
+ *
+ * This file contains refactored code based on the review, addressing key
+ * issues like state management, direct mutation, and component logic bugs.
+ * It remains consolidated for review but is structured for better separation.
+ *
+ * Key Improvements:
+ * - Introduced basic state management concepts (mocks for schema/data).
+ * - Refactored schema modification functions to avoid direct mutation.
+ * - Corrected localStorage key usage in DataBackupPage.
+ * - Used central persistence functions (saveData, loadData, etc.).
+ * - Refactored RelationshipSelect 'add new' logic (removed problematic default).
+ * - Improved validation and error handling patterns.
+ * - Added more comments explaining changes and logic.
+ *
+ * NOTE: This is still consolidated. UI component mocks are basic placeholders.
+ * Client-side storage security remains a concern for sensitive data.
+ * Advanced state management (like Zustand/Context) recommended for real apps.
+ ******************************************************************************/
+
+import type React from "react"; // Base React types
+import { useState, useEffect, useCallback, useMemo, memo } from "react"; // React hooks
+import Link from "next/link"; // Assuming Next.js Link component
+import { ArrowLeft, Download, Upload, Save, RefreshCw, Plus, Trash } from 'lucide-react'; // Icons
+import debounce from "lodash/debounce"; // Utility
+import { memoize } from "lodash"; // Utility
+
+// --- Mocking UI Components and Libs for Consolidation ---
+// These are basic placeholders. Use actual libraries (ShadCN, Sonner) in a real project.
+const Button = ({ children, onClick, disabled, variant, size, asChild, className, 'aria-label': ariaLabel }: any) => {
+    const Tag = asChild ? 'span' : 'button';
+    return <Tag onClick={onClick} disabled={disabled} className={`button ${variant} ${size} ${className}`} aria-label={ariaLabel}>{children}</Tag>;
+};
+const Card = ({ children, className }: any) => <div className={`card ${className}`}>{children}</div>;
+const CardHeader = ({ children }: any) => <div className="card-header">{children}</div>;
+const CardTitle = ({ children }: any) => <h3 className="card-title">{children}</h3>;
+const CardDescription = ({ children }: any) => <p className="card-description">{children}</p>;
+const CardContent = ({ children, className }: any) => <div className={`card-content ${className}`}>{children}</div>;
+const CardFooter = ({ children, className }: any) => <div className={`card-footer ${className}`}>{children}</div>;
+const Input = ({ id, placeholder, value, onChange, className, type, accept, autoFocus, onKeyDown, disabled }: any) => (
+    <input id={id} placeholder={placeholder} value={value ?? ''} onChange={onChange} className={`input ${className}`} type={type} accept={accept} autoFocus={autoFocus} onKeyDown={onKeyDown} disabled={disabled} />
+);
+const Label = ({ children, htmlFor, id }: any) => <label htmlFor={htmlFor} id={id}>{children}</label>;
+// Basic Select Mock (Does not fully replicate ShadCN behavior)
+const Select = ({ children, value, onValueChange, disabled }: any) => (
+    <select value={value} onChange={(e) => onValueChange(e.target.value)} disabled={disabled}>{children}</select>
+);
+const SelectTrigger = ({ children, id, 'aria-invalid': ariaInvalid, className, 'aria-label': ariaLabel }: any) => <div id={id} aria-invalid={ariaInvalid} className={`select-trigger ${className}`} aria-label={ariaLabel}>{children}</div>;
+const SelectValue = ({ children, placeholder }: any) => <span>{children || placeholder || 'Select...'}</span>;
+const SelectContent = ({ children }: any) => <div className="select-content">{children}</div>; // Wrapper for options
+const SelectItem = ({ children, value, className, 'aria-label': ariaLabel, disabled }: any) => <option value={value} className={className} aria-label={ariaLabel} disabled={disabled}>{children}</option>;
+const Switch = ({ id, checked, onCheckedChange, 'aria-labelledby': ariaLabelledBy }: any) => (
+    <input type="checkbox" id={id} checked={checked} onChange={(e) => onCheckedChange(e.target.checked)} aria-labelledby={ariaLabelledBy} />
+);
+// Basic Dialog/Modal Mock
+const Dialog = ({ children, open, onOpenChange }: any) => open ? <div className="dialog-backdrop" onClick={() => onOpenChange(false)}><div className="dialog-container" onClick={(e) => e.stopPropagation()}>{children}</div></div> : null;
+const DialogContent = ({ children, className }: any) => <div className={`dialog-content ${className}`}>{children}</div>;
+const DialogHeader = ({ children }: any) => <div className="dialog-header">{children}</div>;
+const DialogTitle = ({ children }: any) => <h4 className="dialog-title">{children}</h4>;
+const DialogFooter = ({ children }: any) => <div className="dialog-footer">{children}</div>;
+
+// Mock toast functions
+const toastMock = (options: { title: string; description: string; variant?: string }) => {
+    console.log(`Toast [${options.variant || 'default'}]: ${options.title} - ${options.description}`);
+    // In a real app, trigger the actual toast component
+};
+const sonnerToastMock = {
+    success: (title: string, options?: { description?: string }) => console.log(`Sonner Toast [Success]: ${title} - ${options?.description || ''}`),
+    error: (title: string, options?: { description?: string }) => console.log(`Sonner Toast [Error]: ${title} - ${options?.description || ''}`),
+};
+// --- End Mocking ---
+
+// --- Centralized State Management (Conceptual Mocks) ---
+// In a real app, use Zustand, Redux Toolkit, or React Context + useReducer
+// This mock simulates getting/setting schema and data state.
+
+let globalSchema: TableDefinition[] = []; // In-memory schema state
+const SCHEMA_STORAGE_KEY = "app_schema_definitions";
+const DATA_STORAGE_PREFIX = "table_"; // Consistent prefix for table data
+
+// Function to initialize schema (e.g., from localStorage or defaults)
+const initializeSchema = (): TableDefinition[] => {
+    if (typeof window !== 'undefined' && localStorage) {
+        const storedSchema = localStorage.getItem(SCHEMA_STORAGE_KEY);
+        if (storedSchema) {
+            try {
+                const parsedSchema = JSON.parse(storedSchema);
+                if (Array.isArray(parsedSchema)) { // Basic validation
+                    globalSchema = parsedSchema;
+                    console.log("Schema loaded from localStorage.");
+                    return globalSchema;
+                }
+            } catch (e) {
+                console.error("Failed to parse schema from localStorage:", e);
+            }
+        }
+    }
+    // Fallback to initial default schema if nothing in localStorage or error
+    console.log("Initializing with default schema.");
+    globalSchema = [ // Default schema (copy from original data-structure)
+        {
+            id: "customers", name: "Customers", description: "Customer information", fields: [
+                { id: "companyName", label: "Company Name", type: "text", required: true, unique: true, },
+                { id: "contactName", label: "Contact Name", type: "text", required: false, },
+                { id: "email", label: "Email", type: "email", required: false, },
+                { id: "phone", label: "Phone", type: "phone", required: false, },
+                { id: "address", label: "Address", type: "longtext", required: false, },
+                { id: "country", label: "Country", type: "dropdown", required: false, options: ["United States", "Canada", "United Kingdom", /* ... */], },
+                { id: "dateCreated", label: "Date Created", type: "date", required: true, defaultValue: () => new Date().toISOString(), },
+            ]
+        },
+        {
+            id: "suppliers", name: "Suppliers", description: "Supplier information", fields: [
+                { id: "companyName", label: "Company Name", type: "text", required: true, unique: true, },
+                { id: "contactName", label: "Contact Name", type: "text", required: false, },
+                { id: "email", label: "Email", type: "email", required: false, },
+                { id: "phone", label: "Phone", type: "phone", required: false, },
+                { id: "address", label: "Address", type: "longtext", required: false, },
+                { id: "country", label: "Country", type: "dropdown", required: false, options: [/* ... */], },
+                { id: "materials", label: "Materials", type: "dropdown", required: false, options: [/* ... */], },
+                { id: "leadTime", label: "Lead Time (days)", type: "number", required: false, },
+                { id: "dateCreated", label: "Date Created", type: "date", required: true, defaultValue: () => new Date().toISOString(), },
+            ]
+        },
+        // ... include all other default table definitions here ...
+        {
+            id: "qualityControl", name: "Quality Control", description: "Quality control inspections", fields: [
+                { id: "inspectionId", label: "Inspection ID", type: "text", required: true, unique: true, },
+                { id: "orderNumber", label: "Production Order", type: "dropdown", required: true, linkedTable: "productionOrders", linkedField: "orderNumber", },
+                { id: "inspectionDate", label: "Inspection Date", type: "date", required: true, defaultValue: () => new Date().toISOString(), },
+                { id: "inspector", label: "Inspector", type: "text", required: true, },
+                { id: "inspectionType", label: "Inspection Type", type: "dropdown", required: true, options: ["Pre-Production", "During Production", "Final", "Pre-Shipment"], },
+                { id: "sampleSize", label: "Sample Size", type: "number", required: false, },
+                { id: "defectRate", label: "Defect Rate (%)", type: "number", required: false, },
+                { id: "result", label: "Result", type: "dropdown", required: true, options: ["Pass", "Fail", "Conditional Pass"], },
+                { id: "issues", label: "Issues Found", type: "longtext", required: false, },
+                { id: "correctiveActions", label: "Corrective Actions", type: "longtext", required: false, },
+                { id: "dateCreated", label: "Date Created", type: "date", required: true, defaultValue: () => new Date().toISOString(), },
+            ]
+        },
+    ];
+    // Persist the default schema if loaded
+    if (typeof window !== 'undefined' && localStorage) {
+        localStorage.setItem(SCHEMA_STORAGE_KEY, JSON.stringify(globalSchema));
+    }
+    return globalSchema;
+};
+
+// Initialize schema on load
+initializeSchema();
+
+// Function to get the current schema (read-only copy)
+const getCurrentSchema = (): TableDefinition[] => {
+    // Return a deep copy to prevent direct mutation
+    return JSON.parse(JSON.stringify(globalSchema));
+};
+
+// Function to update the schema (simulates dispatching an action)
+const updateGlobalSchema = (newSchema: TableDefinition[]): boolean => {
+    try {
+        // Basic validation on the new schema structure could be added here
+        globalSchema = newSchema;
+        // Persist the updated schema to localStorage
+        if (typeof window !== 'undefined' && localStorage) {
+            localStorage.setItem(SCHEMA_STORAGE_KEY, JSON.stringify(globalSchema));
+            console.log("Global schema updated and persisted.");
+            return true;
+        }
+        return false; // localStorage not available
+    } catch (e) {
+        console.error("Failed to update or persist global schema:", e);
+        return false;
+    }
+};
+
+// Hook to use schema state in components (basic example)
+const useSchema = () => {
+    // In a real app, this would use React state and update when globalSchema changes
+    // For this mock, it just returns the current state on call
+    const [schema, setSchema] = useState<TableDefinition[]>(getCurrentSchema());
+
+    // Simulate subscribing to schema changes (e.g., via an event emitter or context)
+    // This is a placeholder - real implementation needed for reactivity.
+    useEffect(() => {
+        // Example: listen for a custom event 'schemaUpdated'
+        const handleUpdate = () => setSchema(getCurrentSchema());
+        window.addEventListener('schemaUpdated', handleUpdate);
+        return () => window.removeEventListener('schemaUpdated', handleUpdate);
+    }, []);
+
+    // Function to trigger an update (simulates dispatching)
+    const dispatchSchemaUpdate = (newSchema: TableDefinition[]) => {
+        if (updateGlobalSchema(newSchema)) {
+            // Trigger the state update in components using the hook
+             window.dispatchEvent(new CustomEvent('schemaUpdated'));
+        }
+    };
+
+
+    return { schema, dispatchSchemaUpdate };
+};
+// --- End Centralized State Management Mocks ---
+
+
+/******************************************************************************
+ * lib/data-structure.ts (Refactored - Definitions and Helpers)
+ ******************************************************************************/
+
+// Type definitions (FieldType, Field, TableDefinition) - Moved to top for global access
+
+// Helper function to get a table definition from the CURRENT schema
+export function getTable(tableId: string): TableDefinition | undefined {
+  const schema = getCurrentSchema(); // Get current schema state
+  return schema.find((t) => t.id === tableId);
+}
+
+// Helper function to get a field definition from the CURRENT schema
+export function getField(tableId: string, fieldId: string): Field | undefined {
+  const table = getTable(tableId);
+  return table?.fields.find((f) => f.id === fieldId);
+}
+
+// Helper function to get field options (supports dynamic options) - Uses CURRENT schema
+export async function getFieldOptions(tableId: string, fieldId: string): Promise<string[]> {
+    const field = getField(tableId, fieldId); // Uses helper which gets current schema
+    if (!field || (field.type !== "dropdown" && field.type !== "select")) return [];
+
+    if (typeof field.options === "function") {
+        try {
+            // Ensure the function returns string[]
+            const dynamicOptions = await field.options();
+            return Array.isArray(dynamicOptions) ? dynamicOptions.map(String) : [];
+        } catch (error) {
+            console.error(`Error fetching dynamic options for ${tableId}.${fieldId}:`, error);
+            return [];
+        }
+    }
+    // Ensure static options are strings
+    return Array.isArray(field.options) ? field.options.map(String) : [];
+}
+
+
+// Helper function to validate a record against a table schema - Uses CURRENT schema
+export function validateRecord(tableId: string, record: Record<string, any>): { valid: boolean; errors: Record<string, string> } { // Return errors per field
+  const table = getTable(tableId); // Get current schema definition
+  if (!table) return { valid: false, errors: { form: `Table schema '${tableId}' not found` } };
+
+  const errors: Record<string, string> = {}; // Store errors keyed by field ID
+
+  // Check required fields
+  table.fields
+    .filter((field) => field.required)
+    .forEach((field) => {
+      const value = record[field.id];
+      if (value === undefined || value === null || String(value).trim() === "") {
+        errors[field.id] = `${field.label} is required`;
+      }
+    });
+
+  // Check field types and constraints
+  table.fields.forEach((field) => {
+    // Skip further checks if already marked as required and missing
+    if (errors[field.id] && field.required) return;
+
+    const value = record[field.id];
+    // Skip validation if field is not required and value is empty/null/undefined
+    if (!field.required && (value === undefined || value === null || String(value).trim() === "")) {
+        return;
+    }
+
+
+    // Type specific validations
+    switch (field.type) {
+      case "number":
+      case "currency":
+        if (isNaN(Number(value))) {
+          errors[field.id] = `${field.label} must be a valid number`;
+        }
+        break;
+      case "date":
+        if (!(value instanceof Date) && isNaN(Date.parse(String(value)))) {
+          errors[field.id] = `${field.label} must be a valid date`;
+        }
+        break;
+      case "email":
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value))) {
+          errors[field.id] = `${field.label} must be a valid email address`;
+        }
+        break;
+      case "phone":
+        if (!/^[+]?[(]?\d{1,4}[)]?[-\s.]?\d{1,4}[-\s.]?\d{1,9}$/.test(String(value))) {
+           errors[field.id] = `${field.label} must be a valid phone number format`;
+         }
+        break;
+       case "url":
+         try {
+             // Basic URL validation, requires http/https protocol
+             const url = new URL(String(value));
+             if (url.protocol !== "http:" && url.protocol !== "https:") {
+                 throw new Error("Invalid protocol");
+             }
+         } catch (_) {
+             errors[field.id] = `${field.label} must be a valid URL (e.g., https://example.com)`;
+         }
+         break;
+      case "boolean":
+         if (typeof value !== 'boolean') {
+             errors[field.id] = `${field.label} must be a true/false value`;
+         }
+         break;
+      // Add validation for image/file if needed (e.g., check for URL format or object structure)
+    }
+
+    // Check maxLength
+    if (!errors[field.id] && field.maxLength && (field.type === 'text' || field.type === 'longtext' || field.type === 'textarea') && String(value).length > field.maxLength) {
+        errors[field.id] = `${field.label} cannot exceed ${field.maxLength} characters`;
+    }
+
+     // Note: 'unique' check requires comparing against other records - typically server-side.
+     // Note: 'formula' fields are usually calculated, not validated as input.
+     // Note: 'dropdown'/'select' validation against dynamic options is complex client-side.
+
+  });
+
+  return { valid: Object.keys(errors).length === 0, errors };
+}
+// --- End Data Structure Refactor ---
+
+
+/******************************************************************************
+ * lib/relationship-utils.ts (Refactored - Uses current schema state)
+ ******************************************************************************/
+
+// import { getTable, getField, getFieldOptions } from "@/lib/data-structure"; // Use refactored versions above
+// import { memoize } from "lodash"; // Defined above
+
+// Constants
+const DATA_KEY_PREFIX_REL = DATA_STORAGE_PREFIX; // Use consistent prefix
+
+// Type definitions
+// type RecordData = Record<string, any>; // Defined above
+interface RelationshipConfig {
+  onError?: (error: Error, context: string) => void;
+}
+
+// --- Cache Invalidation ---
+// Central cache timestamp store
+const cacheInvalidationTimestamps: Record<string, number> = {};
+// Function to invalidate cache for a specific table
+export function invalidateTableCache(tableId: string): void {
+  cacheInvalidationTimestamps[tableId] = Date.now();
+  // Clear memoized results that depend on this table
+  getRelatedTableData.cache.delete(`${tableId}-${cacheInvalidationTimestamps[tableId]}`); // Requires lodash cache knowledge
+  getUniqueFieldValues.cache.delete(`${tableId}-anyField-${cacheInvalidationTimestamps[tableId]}`); // Example, adjust cache key format
+  console.log(`Cache invalidated for table: ${tableId}`);
+}
+// --- End Cache Invalidation ---
+
+// --- Memoized Helper Functions (Depend on CURRENT schema state) ---
+// These need to be invalidated or re-run if the schema changes.
+// For simplicity here, they still use lodash memoize based on initial schema load.
+// A more robust solution would involve clearing these caches when the schema updates.
+
+const getFieldToTableMap = memoize((): Record<string, string> => {
+  console.log("Generating Field -> Table Map (should re-run on schema change)"); // Log when it runs
+  const map: Record<string, string> = {};
+  const schema = getCurrentSchema(); // Use current schema
+  schema.forEach((table) => {
+    table.fields.forEach((field) => {
+      map[field.id] = table.id;
+      // Add aliases carefully, ensuring they don't overwrite valid mappings
+      if (field.id === "companyName") {
+          if (table.id === "customers" && !map["customer"]) map["customer"] = table.id;
+          if (table.id === "suppliers" && !map["supplier"]) map["supplier"] = table.id;
+      }
+      // ... other aliases ...
+       if (field.id === "poNumber" && table.id === "customerPOs" && !map["customerPO"]) map["customerPO"] = table.id;
+    });
+  });
+  return map;
+});
+
+const getTableToDisplayFieldMap = memoize((): Record<string, string> => {
+   console.log("Generating Table -> Display Field Map (should re-run on schema change)"); // Log when it runs
+  const map: Record<string, string> = {};
+  const schema = getCurrentSchema(); // Use current schema
+  schema.forEach((table) => {
+    const displayField =
+        table.fields.find((f) => f.type === "text")?.id || // Prefer text
+        table.fields.find((f) => f.type === "dropdown")?.id || // Then dropdown
+        table.fields.find((f) => f.type === "email")?.id || // Then email
+        table.fields[0]?.id || // Then first field
+        "id"; // Absolute fallback
+    map[table.id] = displayField;
+  });
+  // Apply overrides AFTER dynamic generation
+  return {
+    ...map, // Start with dynamic map
+    customers: "companyName", // Override
+    suppliers: "companyName", // Override
+    styles: "styleCode",       // Override
+    sampleOrders: "sampleNumber", // Override
+    customerPOs: "poNumber",      // Override
+    productionOrders: "orderNumber", // Override
+    shipments: "shipmentNumber",    // Override
+    qualityControl: "inspectionId", // Override
+  };
+});
+// --- End Memoized Helpers ---
+
+
+// Get related data (uses cache invalidation timestamp)
+export const getRelatedTableData = memoize(
+  (tableId: string, timestamp: number, config: RelationshipConfig = {}): RecordData[] => {
+    if (typeof window === "undefined" || !localStorage) return [];
+    console.log(`Fetching related data for ${tableId} with timestamp ${timestamp}`); // Log cache access
+
+    try {
+      const savedData = localStorage.getItem(`${DATA_KEY_PREFIX_REL}${tableId}_data`);
+      return safeParseJSON<RecordData[]>(savedData, []); // Use safe parse
+    } catch (e) {
+      console.error(`Error loading data for table ${tableId}:`, e);
+      config.onError?.(e instanceof Error ? e : new Error("Unknown error"), `getRelatedTableData(${tableId})`);
+      return [];
+    }
+  },
+  // Cache key includes tableId and the invalidation timestamp
+  (tableId, timestamp) => `${tableId}-${timestamp}`
+);
+
+// Get unique values (uses cache invalidation timestamp)
+export const getUniqueFieldValues = memoize(
+  (tableId: string, fieldId: string, timestamp: number, config: RelationshipConfig = {}): string[] => {
+    console.log(`Fetching unique values for ${tableId}.${fieldId} with timestamp ${timestamp}`); // Log cache access
+    const tableData = getRelatedTableData(tableId, timestamp, config); // Use cached data if timestamp matches
+    const uniqueValues = new Set<string>();
+
+    tableData.forEach((record) => {
+      const value = record[fieldId];
+      if (Array.isArray(value)) {
+        value.forEach((item) => {
+          const strItem = safeToString(item); // Use helper
+          if (strItem !== "") uniqueValues.add(strItem);
+        });
+      } else {
+        const strValue = safeToString(value); // Use helper
+        if (strValue !== "") uniqueValues.add(strValue);
+      }
+    });
+
+    return Array.from(uniqueValues).sort();
+  },
+   // Cache key includes table, field, and timestamp
+   (tableId, fieldId, timestamp) => `${tableId}-${fieldId}-${timestamp}`
+);
+
+
+// Find Related Table (uses memoized map)
+export function findRelatedTable(fieldId: string): string | null {
+  const fieldToTableMap = getFieldToTableMap(); // Uses memoized map
+  const relatedTable = fieldToTableMap[fieldId];
+  // No warning needed here, it's normal for many fields
+  return relatedTable || null;
+}
+
+// Get Display Field (uses memoized map)
+export function getDisplayField(tableId: string): string {
+  const tableToDisplayFieldMap = getTableToDisplayFieldMap(); // Uses memoized map
+  const displayField = tableToDisplayFieldMap[tableId];
+  if (!displayField) {
+    console.warn(`No display field configured for table '${tableId}', falling back to 'id'.`);
+  }
+  return displayField || "id";
+}
+
+// Get Relationship Options (uses current schema and unique values)
+export async function getRelationshipOptions(fieldId: string, config: RelationshipConfig = {}): Promise<string[]> {
+  const relatedTableId = findRelatedTable(fieldId);
+  if (!relatedTableId) return [];
+
+  const field = getField(relatedTableId, fieldId); // Use helper
+
+  // Handle dynamic options function
+  if (field?.options && typeof field.options === "function") {
+    try {
+      return await field.options();
+    } catch (e) {
+      console.error(`Error fetching dynamic options for ${relatedTableId}.${fieldId}:`, e);
+      config.onError?.(e instanceof Error ? e : new Error("Unknown error fetching dynamic options"), `getRelationshipOptions(${fieldId})`);
+      return [];
+    }
+  }
+
+  // Handle static linked data
+  const displayFieldId = getDisplayField(relatedTableId);
+  if (!getField(relatedTableId, displayFieldId)) { // Validate display field exists
+      console.error(`Display field '${displayFieldId}' not found in table '${relatedTableId}' for relationship options of '${fieldId}'.`);
+      return [];
+  }
+
+  // Use the timestamp for cache-aware fetching
+  const timestamp = cacheInvalidationTimestamps[relatedTableId] || 0;
+  return getUniqueFieldValues(relatedTableId, displayFieldId, timestamp, config);
+}
+// --- End Relationship Utils Refactor ---
+
+
+/******************************************************************************
+ * lib/flexible-schema.ts (Refactored - Operates on global schema state)
+ ******************************************************************************/
+
+// import { getCurrentSchema, updateGlobalSchema, getTable, getField, Field, TableDefinition, FieldType } from "@/lib/data-structure"; // Use refactored versions
+// import { memoize } from "lodash"; // Defined above
+// import { invalidateTableCache } from "@/lib/relationship-utils"; // Defined above
+
+// Constants
+const FIELD_TYPES_SCHEMA = [ /* Defined in data-structure */ ] as const;
+const DATA_KEY_PREFIX_SCHEMA = DATA_STORAGE_PREFIX; // Use consistent prefix
+const DEFAULT_DATE_FIELD_SCHEMA: Field = { // Renamed
+  id: "dateCreated", label: "Date Created", type: "date", required: false,
+  notes: "Automatically set when record is created", defaultValue: () => new Date().toISOString(),
+};
+
+// Type definitions
+interface SchemaConfig {
+  // persistToDatabase removed - persistence handled by updateGlobalSchema
+  onError?: (error: Error, context: string) => void;
+}
+
+// Utility to normalize field (ensure it adheres to Field interface)
+const normalizeField = (fieldData: Partial<Field>): Field => {
+    const fieldId = (fieldData.id || `field_${Date.now()}`).trim();
+    const fieldLabel = (fieldData.label || fieldId).trim();
+    let fieldType = (fieldData.type || "text") as FieldType;
+
+    // Basic ID validation (adjust regex as needed)
+    if (!/^[a-zA-Z][a-zA-Z0-9_]*$/.test(fieldId)) {
+        console.warn(`Invalid field ID format: '${fieldId}'. Attempting sanitization.`);
+        // Simple sanitization - replace invalid chars, ensure starts with letter
+        let sanitizedId = fieldLabel.toLowerCase().replace(/[^a-z0-9_]/g, '_').replace(/_{2,}/g, '_');
+        if (!/^[a-zA-Z]/.test(sanitizedId)) sanitizedId = 'f_' + sanitizedId;
+        fieldData.id = sanitizedId.substring(0, 30); // Limit length
+        console.warn(`Sanitized ID: '${fieldData.id}'`);
+    }
+
+
+    // Validate Type
+    const validTypes: FieldType[] = [ "text", "longtext", "number", "date", "email", "phone", "dropdown", "image", "file", "boolean", "currency", "formula", "url", "select", "textarea"];
+    if (!validTypes.includes(fieldType)) {
+        console.warn(`Invalid field type '${fieldType}' for field '${fieldId}'. Defaulting to 'text'.`);
+        fieldType = "text";
+    }
+
+
+    // Build the normalized field, including only relevant properties
+    const normalized: Field = {
+        id: fieldId,
+        label: fieldLabel,
+        type: fieldType,
+        required: fieldData.required || false,
+        notes: fieldData.notes || "",
+        unique: fieldData.unique, // Keep if provided
+        disabled: fieldData.disabled, // Keep if provided
+        defaultValue: fieldData.defaultValue, // Keep if provided
+    };
+
+
+    // Type-specific properties
+    if (fieldType === "dropdown" || fieldType === "select") {
+        normalized.options = fieldData.options;
+        normalized.linkedTable = fieldData.linkedTable;
+        normalized.linkedField = fieldData.linkedField;
+    }
+    if ((fieldType === "text" || fieldType === "longtext" || fieldType === "textarea") && typeof fieldData.maxLength === 'number') {
+        normalized.maxLength = fieldData.maxLength;
+    }
+    if (fieldType === "formula" && typeof fieldData.formula === 'string') {
+        normalized.formula = fieldData.formula;
+    }
+
+
+    return normalized;
+};
+
+
+// Add Field to Table (Updates global schema state)
+export function addFieldToTable(tableId: string, fieldData: Partial<Field>, config: SchemaConfig = {}): boolean {
+  try {
+    const currentSchema = getCurrentSchema(); // Get a copy
+    const tableIndex = currentSchema.findIndex((t) => t.id === tableId);
+
+    if (tableIndex === -1) {
+      throw new Error(`Table ${tableId} not found`);
+    }
+
+    const normalizedField = normalizeField(fieldData); // Normalize the input
+
+    // Check for duplicate ID within the target table
+    if (currentSchema[tableIndex].fields.some((f) => f.id === normalizedField.id)) {
+      throw new Error(`Field ${normalizedField.id} already exists in table ${tableId}`);
+    }
+
+    // Create the updated schema immutably
+    const newSchema = currentSchema.map((table, index) => {
+        if (index === tableIndex) {
+            return {
+                ...table,
+                fields: [...table.fields, normalizedField] // Add the new field
+            };
+        }
+        return table;
+    });
+
+
+    // Update the global state and persist
+    if (updateGlobalSchema(newSchema)) {
+        console.log(`Field ${normalizedField.id} added to table ${tableId} in schema state.`);
+         // Invalidate relationship utils cache because schema changed
+         // This requires a way to signal the change or clear memoized caches directly.
+         // For now, log the need:
+         console.warn("Schema changed: Relationship utils caches (maps) might be stale and need regeneration/clearing.");
+         invalidateTableCache(tableId); // Invalidate data cache for the table
+        return true;
+    } else {
+        throw new Error("Failed to update global schema state.");
+    }
+
+
+  } catch (error) {
+    console.error("Error adding field to table:", error);
+    config.onError?.(error instanceof Error ? error : new Error("Unknown error"), "addFieldToTable");
+    return false;
+  }
+}
+
+// Update Field in Table (Updates global schema state)
+export function updateField(
+  tableId: string,
+  fieldId: string,
+  updates: Partial<Field>,
+  config: SchemaConfig = {},
+): boolean {
+  try {
+     const currentSchema = getCurrentSchema(); // Get a copy
+     const tableIndex = currentSchema.findIndex((t) => t.id === tableId);
+
+
+     if (tableIndex === -1) throw new Error(`Table ${tableId} not found`);
+
+
+     const fieldIndex = currentSchema[tableIndex].fields.findIndex((f) => f.id === fieldId);
+     if (fieldIndex === -1) throw new Error(`Field ${fieldId} not found in table ${tableId}`);
+
+
+     // Prevent changing ID via this function
+     if (updates.id && updates.id !== fieldId) {
+         console.warn(`Attempted to change field ID from '${fieldId}' to '${updates.id}' via updateField. Ignoring ID change.`);
+         delete updates.id;
+     }
+
+
+     const originalField = currentSchema[tableIndex].fields[fieldIndex];
+     const updatedFieldData = { ...originalField, ...updates };
+     const normalizedUpdatedField = normalizeField(updatedFieldData); // Normalize the result
+
+
+     // Create the updated schema immutably
+     const newSchema = currentSchema.map((table, tIndex) => {
+         if (tIndex === tableIndex) {
+             return {
+                 ...table,
+                 fields: table.fields.map((field, fIndex) =>
+                     fIndex === fieldIndex ? normalizedUpdatedField : field
+                 )
+             };
+         }
+         return table;
+     });
+
+
+     // Update the global state and persist
+     if (updateGlobalSchema(newSchema)) {
+         console.log(`Field ${fieldId} updated in table ${tableId} in schema state.`);
+         console.warn("Schema changed: Relationship utils caches (maps) might be stale and need regeneration/clearing.");
+          invalidateTableCache(tableId); // Invalidate data cache
+         return true;
+     } else {
+         throw new Error("Failed to update global schema state.");
+     }
+
+
+  } catch (error) {
+    console.error("Error updating field:", error);
+    config.onError?.(error instanceof Error ? error : new Error("Unknown error"), "updateField");
+    return false;
+  }
+}
+
+
+// Add Table (Updates global schema state)
+export function addTable(
+  tableData: Omit<TableDefinition, "fields"> & { fields: Partial<Field>[] },
+  config: SchemaConfig = {},
+): boolean {
+  try {
+    const currentSchema = getCurrentSchema(); // Get a copy
+
+     // Validate Table ID
+     const tableId = tableData.id.trim();
+     if (!tableId || !/^[a-zA-Z][a-zA-Z0-9_]*$/.test(tableId)) {
+        throw new Error(`Invalid table ID: ${tableId}. Must start with a letter and contain only letters, numbers, and underscores.`);
+     }
+     if (currentSchema.some((t) => t.id === tableId)) {
+       throw new Error(`Table ${tableId} already exists`);
+     }
+
+
+    // Normalize fields and check for duplicates within the new table
+    const fieldIds = new Set<string>();
+    const normalizedFields = tableData.fields.map(field => {
+        const normField = normalizeField(field);
+        if (fieldIds.has(normField.id)) {
+            throw new Error(`Duplicate field ID '${normField.id}' in definition for new table '${tableId}'`);
+        }
+        fieldIds.add(normField.id);
+        return normField;
+    });
+
+
+    // Add default 'dateCreated' field if missing
+    if (!normalizedFields.some((f) => f.id === "dateCreated")) {
+      normalizedFields.push(DEFAULT_DATE_FIELD_SCHEMA);
+    }
+
+    // Create the new table definition
+    const newTable: TableDefinition = {
+      id: tableId,
+      name: tableData.name?.trim() || tableId,
+      description: tableData.description?.trim() || "",
+      fields: normalizedFields,
+    };
+
+    // Create the updated schema immutably
+    const newSchema = [...currentSchema, newTable];
+
+    // Update the global state and persist
+    if (updateGlobalSchema(newSchema)) {
+        console.log(`Table ${tableId} added to schema state.`);
+        // Create the empty data storage for the new table
+        if (typeof window !== 'undefined' && localStorage) {
+            localStorage.setItem(`${DATA_KEY_PREFIX_SCHEMA}${newTable.id}_data`, JSON.stringify([]));
+        }
+         console.warn("Schema changed: Relationship utils caches (maps) might be stale and need regeneration/clearing.");
+        return true;
+    } else {
+        throw new Error("Failed to update global schema state.");
+    }
+
+  } catch (error) {
+    console.error("Error adding table:", error);
+    config.onError?.(error instanceof Error ? error : new Error("Unknown error"), "addTable");
+    return false;
+  }
+}
+
+// Migrate Table Data (Operates directly on localStorage - no schema state change)
+// This function remains largely the same as it modifies persisted data, not the schema definition itself.
+export function migrateTableData(
+  tableId: string,
+  migrationFn: (record: RecordData) => RecordData,
+  config: SchemaConfig = {},
+): boolean {
+  if (typeof window === "undefined" || !localStorage) return false;
+
+  const dataKey = `${DATA_KEY_PREFIX_SCHEMA}${tableId}_data`;
+  try {
+    const savedData = localStorage.getItem(dataKey);
+    if (!savedData) {
+      console.log(`No data found for table ${tableId} to migrate.`);
+      return true;
+    }
+
+    let data: RecordData[];
+    try {
+        data = JSON.parse(savedData);
+        if (!Array.isArray(data)) throw new Error("Data is not an array");
+    } catch (parseError) {
+        throw new Error(`Data for table ${tableId} is corrupted or not an array: ${parseError}`);
+    }
+
+    let migrationErrors = 0;
+    const migratedData = data.map((record, index) => {
+      try {
+        // Provide a deep copy to the migration function if it might mutate
+        const recordCopy = JSON.parse(JSON.stringify(record));
+        const migratedRecord = migrationFn(recordCopy);
+         // Optional: Validate migratedRecord against schema? Could be slow.
+        return migratedRecord;
+      } catch (e) {
+        migrationErrors++;
+        console.warn(`Error migrating record at index ${index} in ${tableId}:`, e);
+        return record; // Return original on error
+      }
+    });
+
+    if (migrationErrors > 0) {
+        console.warn(`Migration for table ${tableId} completed with ${migrationErrors} record errors.`);
+        config.onError?.(new Error(`${migrationErrors} records failed to migrate in ${tableId}`), "migrateTableData - record error");
+    }
+
+    // Save migrated data back
+    localStorage.setItem(dataKey, JSON.stringify(migratedData));
+    console.log(`Migrated ${migratedData.length} records for table ${tableId}.`);
+    invalidateTableCache(tableId); // Invalidate data cache
+    return true;
+
+  } catch (error) {
+    console.error("Error during table data migration process:", error);
+    config.onError?.(error instanceof Error ? error : new Error("Unknown migration error"), "migrateTableData - process");
+    return false;
+  }
+}
+
+// Fetch field options (memoized) - Reuses getFieldOptions which uses current schema
+export const fetchFieldOptions = memoize(
+  async (tableId: string, fieldId: string): Promise<string[]> => {
+    try {
+      return await getFieldOptions(tableId, fieldId);
+    } catch (error) {
+      console.error(`Error fetching options for ${tableId}.${fieldId}:`, error);
+      return [];
+    }
+  },
+  (tableId, fieldId) => `${tableId}.${fieldId}` // Cache key
+);
+// --- End Flexible Schema Refactor ---
+
+
+/******************************************************************************
+ * lib/data-persistence.ts (Refactored - Uses consistent prefix)
+ ******************************************************************************/
+
+// import { getCurrentSchema } from "@/lib/data-structure"; // Use refactored version
+// import { invalidateTableCache } from "@/lib/relationship-utils"; // Defined above
+
+// Constants
+const STORAGE_PREFIX_PERSIST = DATA_STORAGE_PREFIX; // Use consistent prefix
+const LAST_SYNC_KEY_PERSIST = "last_sync_timestamp"; // Renamed
+const MAX_RETRY_ATTEMPTS_PERSIST = 3; // Renamed
+const RETRY_DELAY_PERSIST = 1000; // Renamed
+
+// Type definitions
+interface PersistenceOptions {
+  onSuccess?: () => void;
+  onError?: (error: Error) => void;
+  retryOnFailure?: boolean;
+}
+interface SyncOptions extends PersistenceOptions {
+  forceFullSync?: boolean;
+}
+
+// Utility to safely parse JSON
+function safeParseJSON<T>(json: string | null, defaultValue: T): T {
+    if (json === null || json === undefined) return defaultValue;
+    try {
+        // Add basic check for empty string which is invalid JSON
+        if (json.trim() === "") return defaultValue;
+        return JSON.parse(json) as T;
+    } catch (e) {
+        console.error("Error parsing JSON:", e, "\nJSON string:", json.substring(0, 100)); // Log snippet
+        return defaultValue;
+    }
+}
+
+
+// Save data to localStorage with retry
+export async function saveData(
+  tableId: string,
+  data: any[], // Expecting array of records
+  options: PersistenceOptions = {},
+): Promise<boolean> {
+   if (typeof window === 'undefined' || !localStorage) {
+       console.error("localStorage not available. Cannot save data.");
+       options.onError?.(new Error("localStorage not available"));
+       return false;
+   }
+   if (!Array.isArray(data)) {
+        console.error(`Invalid data format for saveData (table: ${tableId}): Expected array.`);
+        options.onError?.(new Error("Invalid data format: Expected array"));
+        return false;
+   }
+
+  const storageKey = `${STORAGE_PREFIX_PERSIST}${tableId}_data`;
+  let attempts = 0;
+
+  const attemptSave = async (): Promise<boolean> => {
+    try {
+      const stringifiedData = JSON.stringify(data);
+      localStorage.setItem(storageKey, stringifiedData);
+
+      // Verify save (optional, can be slow)
+      // if (localStorage.getItem(storageKey) !== stringifiedData) {
+      //   throw new Error("Failed to verify data in localStorage. Storage might be full or write failed silently.");
+      // }
+
+      invalidateTableCache(tableId); // Invalidate cache after successful save
+      options.onSuccess?.();
+      return true;
+    } catch (error) {
+      console.error(`Error saving data for table ${tableId} (Attempt ${attempts + 1}):`, error);
+
+      if (options.retryOnFailure && attempts < MAX_RETRY_ATTEMPTS_PERSIST) {
+        attempts++;
+        console.log(`Retrying save for ${tableId} (attempt ${attempts}/${MAX_RETRY_ATTEMPTS_PERSIST})...`);
+        await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_PERSIST * attempts));
+        return attemptSave();
+      }
+
+      const typedError = error instanceof Error ? error : new Error("Unknown error saving data");
+      options.onError?.(typedError);
+      return false;
+    }
+  };
+
+  return attemptSave();
+}
+
+// Load data from localStorage
+export function loadData<T = Record<string, any>>(tableId: string, defaultValue: T[] = []): T[] {
+    if (typeof window === 'undefined' || !localStorage) {
+        console.warn("localStorage not available. Returning default value.");
+        return defaultValue;
+    }
+    const storageKey = `${STORAGE_PREFIX_PERSIST}${tableId}_data`;
+    try {
+        const savedData = localStorage.getItem(storageKey);
+        // Use safeParseJSON with the provided default value
+        const parsedData = safeParseJSON<T[]>(savedData, defaultValue);
+        // Ensure the result is an array, even if parsing returns something else unexpectedly
+        return Array.isArray(parsedData) ? parsedData : defaultValue;
+    } catch (error) {
+        console.error(`Error loading data for table ${tableId}:`, error);
+        return defaultValue; // Return default on any unexpected error during load
+    }
+}
+
+
+// Delete data from localStorage
+export function deleteData(tableId: string, options: PersistenceOptions = {}): boolean {
+    if (typeof window === 'undefined' || !localStorage) {
+        console.error("localStorage not available. Cannot delete data.");
+        options.onError?.(new Error("localStorage not available"));
+        return false;
+    }
+    const storageKey = `${STORAGE_PREFIX_PERSIST}${tableId}_data`;
+    try {
+        localStorage.removeItem(storageKey);
+        invalidateTableCache(tableId); // Invalidate cache after deletion
+        options.onSuccess?.();
+        return true;
+    } catch (error) {
+        console.error(`Error deleting data for table ${tableId}:`, error);
+        const typedError = error instanceof Error ? error : new Error("Unknown error deleting data");
+        options.onError?.(typedError);
+        return false;
+    }
+}
+
+
+// Backup all data for tables defined in the CURRENT schema
+export function backupAllData(): Record<string, any[]> {
+    if (typeof window === 'undefined' || !localStorage) {
+        console.error("localStorage not available. Cannot perform backup.");
+        return {};
+    }
+    const backup: Record<string, any[]> = {};
+    const schema = getCurrentSchema(); // Get current schema
+
+    schema.forEach(table => {
+        // Use loadData which handles parsing and defaults
+        backup[table.id] = loadData(table.id, []);
+    });
+
+    // Optionally include schema definition in backup for structural reference during restore
+    // backup["__schema_snapshot__"] = schema;
+
+    return backup;
+}
+
+// Restore data from backup (only restores tables present in the CURRENT schema)
+export async function restoreFromBackup(
+  backup: Record<string, any[]>,
+  options: PersistenceOptions = {}
+): Promise<boolean> {
+    if (typeof window === 'undefined' || !localStorage) {
+        console.error("localStorage not available. Cannot restore data.");
+        options.onError?.(new Error("localStorage not available"));
+        return false;
+    }
+    let overallSuccess = true;
+    const restoreErrors: string[] = [];
+    const schema = getCurrentSchema(); // Get current schema to know which tables to restore
+
+    const restorePromises = schema.map(async (table) => {
+        const tableId = table.id;
+        const dataToRestore = backup[tableId];
+
+        if (dataToRestore === undefined) {
+            console.warn(`Skipping restore for ${tableId}: No data found in backup object.`);
+            // Not necessarily an error, maybe the table is new since the backup
+            return true; // Consider it success for this table
+        }
+
+        if (!Array.isArray(dataToRestore)) {
+            console.warn(`Skipping restore for ${tableId}: Data in backup is not an array.`);
+            restoreErrors.push(`${tableId}: Invalid data format (not an array)`);
+            overallSuccess = false;
+            return false;
+        }
+
+        // Optional: Add validation for each record in dataToRestore against the current schema
+        // This could be slow for large backups.
+        // dataToRestore.forEach(record => {
+        //     const { valid, errors } = validateRecord(tableId, record);
+        //     if (!valid) console.warn(`Record in backup for ${tableId} has validation issues:`, errors, record);
+        // });
+
+        const success = await saveData(tableId, dataToRestore, {
+            retryOnFailure: options.retryOnFailure,
+            onError: (err) => {
+                console.error(`Error restoring ${tableId}:`, err);
+                restoreErrors.push(`${tableId}: ${err.message}`);
+                // Don't set overallSuccess to false here, saveData might retry
+            }
+        });
+
+        if (!success) {
+            overallSuccess = false; // Mark overall failure if saveData ultimately fails
+        }
+        return success;
+    });
+
+
+    try {
+        await Promise.all(restorePromises);
+
+        if (overallSuccess) {
+            console.log("Restore completed.");
+            options.onSuccess?.();
+        } else {
+            const errorMsg = `Restore completed with errors: ${restoreErrors.join("; ")}`;
+            console.error(errorMsg);
+            options.onError?.(new Error(errorMsg));
+        }
+        return overallSuccess;
+    } catch (error) {
+        console.error("Unexpected error during restore process:", error);
+        const typedError = error instanceof Error ? error : new Error("Unknown error during restore process");
+        options.onError?.(typedError);
+        return false;
+    }
+}
+
+
+// Synchronize with remote storage (Placeholder - requires actual backend implementation)
+export async function syncWithRemote(options: SyncOptions = {}): Promise<boolean> {
+    if (typeof window === 'undefined' || !localStorage) {
+        console.warn("localStorage not available. Cannot sync.");
+        options.onError?.(new Error("localStorage not available"));
+        return false;
+    }
+    console.warn("syncWithRemote is a placeholder and does not perform actual synchronization.");
+    // Placeholder logic...
+    try {
+        const lastSync = localStorage.getItem(LAST_SYNC_KEY_PERSIST);
+        console.log(`Simulating sync. Last sync timestamp: ${lastSync}`);
+        // TODO: Implement actual API calls to fetch remote changes and push local changes
+        await new Promise(resolve => setTimeout(resolve, 750)); // Simulate delay
+        localStorage.setItem(LAST_SYNC_KEY_PERSIST, Date.now().toString());
+        options.onSuccess?.();
+        return true;
+    } catch (error) {
+        console.error("Error during simulated sync:", error);
+        options.onError?.(error instanceof Error ? error : new Error("Sync simulation failed"));
+        return false;
+    }
+}
+
+// Get storage usage statistics
+export function getStorageStats(): { usedBytes: number, totalBytes: number | null, tables: Record<string, number> } {
+    if (typeof window === 'undefined' || !localStorage) {
+        console.warn("localStorage not available. Cannot get storage stats.");
+        return { usedBytes: 0, totalBytes: null, tables: {} };
+    }
+    const stats: { usedBytes: number, totalBytes: number | null, tables: Record<string, number> } = {
+        usedBytes: 0,
+        totalBytes: null, // Cannot reliably get localStorage limit directly
+        tables: {}
+    };
+    const schema = getCurrentSchema(); // Get current list of tables
+
+    try {
+        // Estimate total usage by iterating through all keys (less accurate but necessary without specific API)
+        let totalLocalStorageBytes = 0;
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key) {
+                const value = localStorage.getItem(key) || "";
+                totalLocalStorageBytes += (key.length + value.length) * 2; // Estimate bytes (UTF-16)
+            }
+        }
+        stats.usedBytes = totalLocalStorageBytes; // Use total estimate for overall usage
+
+        // Estimate per-table usage based on schema
+        schema.forEach(table => {
+            const key = `${STORAGE_PREFIX_PERSIST}${table.id}_data`;
+            const value = localStorage.getItem(key);
+            if (value !== null) {
+                stats.tables[table.id] = (key.length + value.length) * 2; // Estimate bytes
+            } else {
+                stats.tables[table.id] = 0;
+            }
+        });
+
+        // Attempt to use navigator.storage for quota estimate (may include more than localStorage)
+        if (navigator.storage && navigator.storage.estimate) {
+            navigator.storage.estimate().then(estimate => {
+                stats.totalBytes = estimate.quota ?? null; // Assign estimated quota
+            }).catch(err => console.warn("Could not estimate storage quota:", err));
+        }
+
+    } catch (error) {
+        console.error("Error calculating storage stats:", error);
+    }
+    return stats;
+}
+
+
+// Clear all application data (prefixed keys, schema, backup preview, sync time)
+export function clearAllData(confirmationPhrase: string): boolean {
+    if (confirmationPhrase !== "DELETE ALL DATA") {
+        alert("Incorrect confirmation phrase. Data not deleted.");
+        console.error("Incorrect confirmation phrase provided.");
+        return false;
+    }
+     if (typeof window === 'undefined' || !localStorage) {
+        console.error("localStorage not available. Cannot clear data.");
+        return false;
+    }
+
+    try {
+        const keysToRemove: string[] = [];
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && (
+                key.startsWith(STORAGE_PREFIX_PERSIST) || // All table data
+                key === SCHEMA_STORAGE_KEY ||             // Stored schema
+                key === "backupDataPreview" ||          // Backup preview
+                key === LAST_SYNC_KEY_PERSIST           // Sync timestamp
+            )) {
+                keysToRemove.push(key);
+            }
+        }
+
+        keysToRemove.forEach(key => {
+            localStorage.removeItem(key);
+            console.log(`Removed item: ${key}`);
+        });
+
+        // Clear the in-memory schema state and re-initialize with defaults
+        initializeSchema();
+        // Trigger schema update event for any listeners
+        window.dispatchEvent(new CustomEvent('schemaUpdated'));
+
+
+        // Invalidate all known table caches (though data is gone)
+        const schema = getCurrentSchema();
+        schema.forEach(table => invalidateTableCache(table.id));
+
+        console.log("All application data cleared.");
+        alert("All application data has been cleared.");
+        return true;
+    } catch (error) {
+        console.error("Error clearing application data:", error);
+        alert("An error occurred while clearing data.");
+        return false;
+    }
+}
+// --- End Data Persistence Refactor ---
+
+
+/******************************************************************************
+ * app/data-backup/page.tsx (Refactored Component)
+ ******************************************************************************/
+"use client"
+
+// Imports are handled globally in this consolidated file
+
+export default function DataBackupPage() {
+  const [backupPreviewData, setBackupPreviewData] = useState<Record<string, any[]>>({});
+  const [actionState, setActionState] = useState({ isBackingUp: false, isRestoring: false });
+  const [fileError, setFileError] = useState<string | null>(null);
+  const { schema } = useSchema(); // Use the schema hook
+
+  // Load existing backup preview from localStorage on mount
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const storedBackup = localStorage.getItem("backupDataPreview");
+      if (storedBackup) {
+        setBackupPreviewData(JSON.parse(storedBackup));
+      }
+    } catch (error) {
+      console.error("Error reading backup preview from localStorage:", error);
+      localStorage.removeItem("backupDataPreview");
+    }
+  }, []);
+
+  // Handle file upload for restore
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setFileError(null);
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (file.type !== "application/json") {
+      const errorMsg = "Invalid file type. Please upload a JSON file (.json).";
+      setFileError(errorMsg);
+      toastMock({ title: "Error", description: errorMsg, variant: "destructive" });
+      setBackupPreviewData({});
+      if (event.target) event.target.value = '';
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e: ProgressEvent<FileReader>) => {
+      try {
+        const result = e.target?.result;
+        if (typeof result !== 'string') throw new Error("Failed to read file content.");
+        const jsonData = JSON.parse(result);
+
+        if (typeof jsonData !== 'object' || jsonData === null || Array.isArray(jsonData)) {
+          throw new Error("Invalid JSON structure: Backup must be an object mapping table IDs to arrays.");
+        }
+
+        // Validate keys and array structure
+        let unknownKeys: string[] = [];
+        for (const key in jsonData) {
+          if (!getTable(key)) { // Check against current schema
+            unknownKeys.push(key);
+          }
+          if (!Array.isArray(jsonData[key])) {
+            throw new Error(`Invalid JSON structure: Value for table '${key}' must be an array.`);
+          }
+        }
+        if (unknownKeys.length > 0) {
+             console.warn(`Backup file contains unknown or removed table keys: ${unknownKeys.join(', ')}. These will be ignored during restore.`);
+             toastMock({ title: "Warning", description: `Backup contains unknown tables: ${unknownKeys.join(', ')}. They will be ignored.`, variant: "default"});
+         }
+
+
+        setBackupPreviewData(jsonData);
+        localStorage.setItem("backupDataPreview", JSON.stringify(jsonData)); // Save valid preview
+        toastMock({ title: "File Loaded", description: "Backup file loaded successfully. Ready to restore.", variant: "default"});
+
+      } catch (error) {
+        const errorMsg = `Error reading backup file: ${error instanceof Error ? error.message : "Unknown error"}`;
+        console.error("Invalid JSON file:", error);
+        setFileError(errorMsg);
+        toastMock({ title: "Error", description: errorMsg, variant: "destructive" });
+        setBackupPreviewData({});
+        localStorage.removeItem("backupDataPreview");
+        if (event.target) event.target.value = '';
+      }
+    };
+    reader.onerror = () => {
+      const errorMsg = "Failed to read the backup file.";
+      setFileError(errorMsg);
+      toastMock({ title: "Error", description: errorMsg, variant: "destructive" });
+      setBackupPreviewData({});
+      if (event.target) event.target.value = '';
+    };
+    reader.readAsText(file);
+  };
+
+  // Create backup using the persistence function
+  const handleBackup = () => {
+    setActionState({ isBackingUp: true, isRestoring: false });
+    try {
+      const currentBackupData = backupAllData(); // Use central function
+      setBackupPreviewData(currentBackupData);
+      localStorage.setItem("backupDataPreview", JSON.stringify(currentBackupData));
+      toastMock({ title: "Backup Created", description: "Current data backup created and ready for export." });
+    } catch (error) {
+      console.error("Backup creation failed:", error);
+      toastMock({ title: "Backup Failed", description: `Could not create backup: ${error instanceof Error ? error.message : "Unknown error"}`, variant: "destructive" });
+    } finally {
+      setActionState({ isBackingUp: false, isRestoring: false });
+    }
+  };
+
+  // Export the current backup preview
+  const handleExport = () => {
+    if (!Object.keys(backupPreviewData).length) {
+      toastMock({ title: "Info", description: "No backup data available to export. Create or load a backup first.", variant: "default" });
+      return;
+    }
+    try {
+      const json = JSON.stringify(backupPreviewData, null, 2);
+      const blob = new Blob([json], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      a.href = url;
+      a.download = `apparel-tracker-backup-${timestamp}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toastMock({ title: "Export Started", description: "Backup file download initiated." });
+    } catch (error) {
+      console.error("Export failed:", error);
+      toastMock({ title: "Export Error", description: `Failed to export backup: ${error instanceof Error ? error.message : "Unknown error"}`, variant: "destructive" });
+    }
+  };
+
+  // Restore using the persistence function
+  const handleRestore = async () => {
+    if (!Object.keys(backupPreviewData).length) {
+      toastMock({ title: "Error", description: "No backup data loaded to restore.", variant: "destructive" });
+      return;
+    }
+    const confirmed = window.confirm("WARNING: Restoring will overwrite all current data for the tables included in the backup file. This cannot be undone. Are you sure you want to proceed?");
+    if (!confirmed) return;
+
+    setActionState({ isBackingUp: false, isRestoring: true });
+    setFileError(null);
+
+    try {
+      const success = await restoreFromBackup(backupPreviewData, {
+        onError: (err) => {
+            // Error toast shown by restoreFromBackup's internal logging/callback now
+            // toastMock({ title: "Restore Partially Failed", description: `Error: ${err.message}`, variant: "destructive"});
+        }
+      });
+
+      if (success) {
+        toastMock({ title: "Success", description: "Data restored successfully. Reloading application..." });
+        setBackupPreviewData({}); // Clear preview
+        localStorage.removeItem("backupDataPreview");
+        setTimeout(() => window.location.reload(), 1500); // Reload page
+      } else {
+        // Error message handled by the onError callback in restoreFromBackup
+         toastMock({ title: "Restore Failed", description: "Restore completed with errors. Check console for details.", variant: "destructive" });
+      }
+    } catch (error) {
+      console.error("Restore initiation failed:", error);
+      toastMock({ title: "Restore Failed", description: `An unexpected error occurred: ${error instanceof Error ? error.message : "Unknown error"}`, variant: "destructive" });
+    } finally {
+      setActionState({ isBackingUp: false, isRestoring: false });
+    }
+  };
+
+  // Get current table names from schema for display
+  const currentTableNames = schema.map(t => t.name).join(', ');
+
+  return (
+    <div className="flex min-h-screen flex-col">
+      {/* Header remains the same */}
+      <header className="bg-background border-b">
+        <div className="container flex h-16 items-center px-4 md:px-6">
+          <Link href="/" className="text-lg font-semibold">Apparel Supply Chain Tracker</Link>
+          <nav className="ml-auto flex gap-4 sm:gap-6">
+            <Link href="/dashboard" className="text-sm font-medium hover:underline underline-offset-4">Dashboard</Link>
+            <Link href="/tables" className="text-sm font-medium hover:underline underline-offset-4">Tables</Link>
+          </nav>
+        </div>
+      </header>
+      <main className="flex-1 p-4 md:p-6">
+        <div className="mx-auto max-w-4xl grid gap-6">
+          {/* Back button remains the same */}
+          <div className="flex items-center">
+            <Button variant="ghost" size="icon" asChild className="mr-2"><Link href="/dashboard"><ArrowLeft className="h-4 w-4" /><span className="sr-only">Back</span></Link></Button>
+            <h1 className="text-2xl font-bold tracking-tight">Data Backup & Recovery</h1>
+          </div>
+
+          {/* Backup/Restore Card */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Backup & Restore</CardTitle>
+              <CardDescription>Create/Export a backup of current tables ({currentTableNames || 'None defined'}) or Restore from a previously exported .json file.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Backup Actions */}
+              <div className="flex flex-wrap gap-3 border-b pb-4">
+                <Button onClick={handleBackup} disabled={actionState.isBackingUp || actionState.isRestoring}>
+                  {actionState.isBackingUp ? <><RefreshCw className="mr-2 h-4 w-4 animate-spin" />Creating...</> : <><Save className="mr-2 h-4 w-4" />Create Backup</>}
+                </Button>
+                <Button onClick={handleExport} disabled={!Object.keys(backupPreviewData).length || actionState.isBackingUp || actionState.isRestoring} variant="outline">
+                  <Download className="mr-2 h-4 w-4" />Export Backup File
+                </Button>
+              </div>
+              {/* Restore Actions */}
+              <div className="pt-4 space-y-3">
+                <Label htmlFor="file-upload" className="block text-sm font-medium">Upload Backup File (.json) to Restore:</Label>
+                <Input id="file-upload" type="file" accept=".json,application/json" onChange={handleFileUpload} disabled={actionState.isBackingUp || actionState.isRestoring} className="block w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-primary-foreground hover:file:bg-primary/90" />
+                {fileError && <p className="text-sm text-destructive">{fileError}</p>}
+                {Object.keys(backupPreviewData).length > 0 && !fileError && (
+                  <CardDescription>Backup loaded for tables: {Object.keys(backupPreviewData).filter(key => key !== '__schema_snapshot__').join(', ')}. Ready to restore.</CardDescription>
+                )}
+                <Button onClick={handleRestore} disabled={actionState.isRestoring || !Object.keys(backupPreviewData).length || actionState.isBackingUp || !!fileError} variant="secondary" className="w-full">
+                  {actionState.isRestoring ? <><RefreshCw className="mr-2 h-4 w-4 animate-spin" />Restoring...</> : <><Upload className="mr-2 h-4 w-4" />Restore From Loaded Backup</>}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Instructions Card remains the same */}
+           <Card>
+             <CardHeader>
+               <CardTitle>Data Recovery Instructions</CardTitle>
+               <CardDescription>Follow these steps if you're experiencing data loss or need to transfer data.</CardDescription>
+             </CardHeader>
+             <CardContent>
+               <div className="space-y-4">
+                 {/* Step 1 */}
+                 <div className="flex items-start gap-2">
+                   <div className="bg-primary/10 text-primary rounded-full w-6 h-6 flex items-center justify-center shrink-0">1</div>
+                   <div>
+                     <h3 className="font-medium">Create Backup</h3>
+                     <p className="text-sm text-muted-foreground">Click "Create Backup" to prepare your current application data.</p>
+                   </div>
+                 </div>
+                 {/* Step 2 */}
+                 <div className="flex items-start gap-2">
+                   <div className="bg-primary/10 text-primary rounded-full w-6 h-6 flex items-center justify-center shrink-0">2</div>
+                   <div>
+                     <h3 className="font-medium">Export Backup File</h3>
+                     <p className="text-sm text-muted-foreground">Click "Export Backup File" to download the prepared backup (.json) for safekeeping or transfer.</p>
+                   </div>
+                 </div>
+                 {/* Step 3 */}
+                 <div className="flex items-start gap-2">
+                   <div className="bg-primary/10 text-primary rounded-full w-6 h-6 flex items-center justify-center shrink-0">3</div>
+                   <div>
+                     <h3 className="font-medium">Restore When Needed</h3>
+                     <p className="text-sm text-muted-foreground">Click "Upload Backup File" and select your saved .json file. Once loaded, click "Restore From Loaded Backup". <strong className="text-destructive">Warning: This overwrites current data.</strong></p>
+                   </div>
+                 </div>
+               </div>
+             </CardContent>
+           </Card>
+
+        </div>
+      </main>
+    </div>
+  );
+}
+// --- End DataBackupPage Refactor ---
+
+
+/******************************************************************************
+ * app/tables/create/page.tsx (Refactored Component)
+ ******************************************************************************/
+"use client"
+
+// Imports handled globally
+
+// Interfaces for component state
+interface CreateFieldState {
+  id: number; // Temporary UI key
+  name: string;
+  type: FieldType;
+  required: boolean;
+}
+
+// Constants
+const FIELD_TYPES_CREATE: FieldType[] = [ // Available types for creation UI
+  "text", "longtext", "number", "date", "email", "phone", "url",
+  "boolean", "dropdown", "select", "textarea", "currency",
+  // "image", "file", // Require more complex UI/handling, omitted for now
+  // "formula", // Requires calculation engine, omitted for now
+];
+const DEBOUNCE_DELAY_CREATE = 300;
+
+export default function CreateTablePage() {
+  const [fields, setFields] = useState<CreateFieldState[]>([{ id: Date.now(), name: "", type: "text", required: false }]);
+  const [tableName, setTableName] = useState<string>("");
+  const [tableDescription, setTableDescription] = useState<string>("");
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({}); // Store validation errors
+
+  // Debounced setters (less critical now with direct state updates)
+  // const debouncedSetTableName = useMemo(() => debounce((value: string) => setTableName(value), DEBOUNCE_DELAY_CREATE), []);
+  // const debouncedSetTableDescription = useMemo(() => debounce((value: string) => setTableDescription(value), DEBOUNCE_DELAY_CREATE), []);
+  // useEffect(() => { /* Cleanup */ }, []);
+
+  const addField = useCallback(() => {
+    setFields((prev) => [...prev, { id: Date.now(), name: "", type: "text", required: false }]);
+  }, []);
+
+  const removeField = useCallback((id: number) => {
+    setFields((prev) => {
+        // Prevent removing the last field
+        if (prev.length <= 1) return prev;
+        return prev.filter((field) => field.id !== id);
+    });
+  }, []);
+
+
+  const updateField = useCallback((id: number, key: keyof CreateFieldState, value: string | boolean) => {
+    setFields((prev) => prev.map((field) => (field.id === id ? { ...field, [key]: value } : field)));
+     // Clear errors for the specific field being updated
+     setFormErrors(prevErrors => {
+         const newErrors = { ...prevErrors };
+         delete newErrors[`field_${id}_name`]; // Clear potential name error for this field
+         delete newErrors[`field_${id}_id`];   // Clear potential ID error for this field
+         return newErrors;
+     });
+  }, []);
+
+  // Validation function
+  const validateForm = useCallback((): boolean => {
+    const errors: Record<string, string> = {};
+    const resultingTableId = tableName.trim().toLowerCase().replace(/\s+/g, "_");
+
+    if (!tableName.trim()) {
+      errors.tableName = "Table name is required";
+    } else if (!/^[a-zA-Z][a-zA-Z0-9_]*$/.test(resultingTableId)) {
+      errors.tableName = "Table name must result in a valid ID (starts with letter, then letters, numbers, underscores)";
+    } else if (getTable(resultingTableId)) { // Check if table ID already exists
+        errors.tableName = `A table with ID '${resultingTableId}' already exists.`;
+    }
+
+    if (fields.length === 0) {
+      errors.form = "At least one field is required"; // General form error
+    }
+
+    const fieldNames = new Set<string>();
+    const fieldIds = new Set<string>();
+
+    fields.forEach(field => {
+      const trimmedName = field.name.trim();
+      const resultingFieldId = trimmedName.toLowerCase().replace(/\s+/g, "_");
+
+      if (!trimmedName) {
+        errors[`field_${field.id}_name`] = "Field name is required";
+      } else {
+          if (!/^[a-zA-Z][a-zA-Z0-9_]*$/.test(resultingFieldId)) {
+              errors[`field_${field.id}_name`] = `Name results in invalid ID ('${resultingFieldId}'). Use letters, numbers, underscores, starting with letter.`;
+          } else if (fieldIds.has(resultingFieldId)) {
+              errors[`field_${field.id}_name`] = `Field name results in duplicate ID '${resultingFieldId}'`;
+          } else {
+              fieldIds.add(resultingFieldId);
+          }
+          // Check for duplicate display names (optional but good UX)
+          if (fieldNames.has(trimmedName)) {
+               errors[`field_${field.id}_name`] = `Field name "${trimmedName}" is duplicated`;
+           } else {
+               fieldNames.add(trimmedName);
+           }
+      }
+    });
+
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0; // Valid if no errors
+  }, [tableName, fields]); // Dependencies for validation
+
+
+  // Handle table creation using the centralized function
+  const handleCreateTable = useCallback(async () => {
+    if (!validateForm()) {
+        toastMock({ title: "Validation Failed", description: "Please fix the errors indicated.", variant: "destructive" });
+        return;
+    }
+
+    setIsSubmitting(true);
+    setFormErrors({}); // Clear previous errors on successful validation
+
+
+    try {
+      const tableId = tableName.trim().toLowerCase().replace(/\s+/g, "_");
+      const schemaFields: Partial<Field>[] = fields.map(f => ({
+        id: f.name.trim().toLowerCase().replace(/\s+/g, "_"),
+        label: f.name.trim(),
+        type: f.type,
+        required: f.required,
+      }));
+
+      // Use the refactored addTable function
+      const success = addTable(
+        {
+          id: tableId,
+          name: tableName.trim(),
+          description: tableDescription.trim(),
+          fields: schemaFields
+        },
+        {
+          onError: (err, context) => {
+            console.error(`Error in ${context}:`, err);
+            // Display error specific to table creation failure
+            setFormErrors({ form: `Failed to create table: ${err.message}` });
+            toastMock({ title: "Creation Error", description: err.message, variant: "destructive" });
+          }
+        }
+      );
+
+      if (success) {
+        toastMock({ title: "Success", description: `Table "${tableName.trim()}" created successfully. Redirecting...`, variant: "default" });
+        setTimeout(() => {
+          if (typeof window !== 'undefined') window.location.href = "/tables"; // Adjust target route
+        }, 1500);
+      }
+      // No 'else' needed, error handled by onError callback
+
+    } catch (error) { // Catch unexpected errors in this handler's logic
+      console.error("Unexpected error during table creation submission:", error);
+      setFormErrors({ form: `An unexpected error occurred: ${error instanceof Error ? error.message : "Unknown error"}` });
+      toastMock({ title: "Error", description: "An unexpected error occurred.", variant: "destructive" });
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [tableName, tableDescription, fields, validateForm]); // Add dependencies
+
+
+  return (
+    <div className="flex min-h-screen flex-col">
+      {/* Header */}
+       <header className="bg-background border-b">
+         <div className="container flex h-16 items-center px-4 md:px-6">
+           <Link href="/" className="text-lg font-semibold">Apparel Supply Chain Tracker</Link>
+           <nav className="ml-auto flex gap-4 sm:gap-6">
+             <Link href="/dashboard" className="text-sm font-medium hover:underline underline-offset-4">Dashboard</Link>
+             <Link href="/tables" className="text-sm font-medium hover:underline underline-offset-4">Tables</Link>
+           </nav>
+         </div>
+       </header>
+       {/* Main Content */}
+      <main className="flex-1 p-4 md:p-6">
+        <div className="mx-auto max-w-3xl grid gap-4 md:gap-8">
+           {/* Back Button & Title */}
+           <div className="flex items-center">
+             <Button variant="ghost" size="icon" asChild className="mr-2"><Link href="/tables"><ArrowLeft className="h-4 w-4" /><span className="sr-only">Back to Tables</span></Link></Button>
+             <h1 className="text-2xl font-bold tracking-tight">Create New Table</h1>
+           </div>
+
+           {/* General Form Errors */}
+           {formErrors.form && <p className="text-sm text-destructive bg-destructive/10 p-2 rounded-md">{formErrors.form}</p>}
+
+
+           {/* Table Info Card */}
+           <Card>
+             <CardHeader>
+               <CardTitle>Table Information</CardTitle>
+               <CardDescription>Define the name and description for your new table.</CardDescription>
+             </CardHeader>
+             <CardContent className="grid gap-4">
+               <div className="grid gap-2">
+                 <Label htmlFor="table-name">Table Name</Label>
+                 <Input
+                   id="table-name"
+                   placeholder="e.g., Products, Orders"
+                   value={tableName}
+                   onChange={(e) => { setTableName(e.target.value); setFormErrors(p => ({...p, tableName: undefined, form: undefined})); }}
+                   className={formErrors.tableName ? "border-destructive" : ""}
+                   aria-describedby={formErrors.tableName ? "table-name-error" : undefined}
+                   aria-invalid={!!formErrors.tableName}
+                 />
+                 {formErrors.tableName && <p id="table-name-error" className="text-xs text-destructive">{formErrors.tableName}</p>}
+               </div>
+               <div className="grid gap-2">
+                 <Label htmlFor="table-description">Description (Optional)</Label>
+                 <Input
+                   id="table-description"
+                   placeholder="Describe the purpose of this table"
+                   value={tableDescription}
+                   onChange={(e) => setTableDescription(e.target.value)}
+                 />
+               </div>
+             </CardContent>
+           </Card>
+
+           {/* Table Fields Card */}
+           <Card>
+             <CardHeader>
+               <CardTitle>Table Fields</CardTitle>
+               <CardDescription>Define the columns for your table. Each field name must be unique.</CardDescription>
+             </CardHeader>
+             <CardContent className="grid gap-6">
+               {fields.map((field, index) => {
+                   const nameErrorId = `field-${field.id}-name-error`;
+                   const fieldNameError = formErrors[`field_${field.id}_name`];
+                   return (
+                       <div key={field.id} className={`grid gap-4 p-4 border rounded-lg relative ${fieldNameError ? 'border-destructive bg-destructive/5' : 'border-border'}`}>
+                         {fields.length > 1 && (
+                           <Button variant="ghost" size="icon" className="absolute top-2 right-2 text-muted-foreground hover:text-destructive" onClick={() => removeField(field.id)} aria-label="Remove field">
+                             <Trash className="h-4 w-4" />
+                           </Button>
+                         )}
+                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                           <div className="grid gap-2">
+                             <Label htmlFor={`field-name-${field.id}`}>Field Name</Label>
+                             <Input
+                               id={`field-name-${field.id}`}
+                               placeholder="e.g., sku, color, quantity"
+                               value={field.name}
+                               onChange={(e) => updateField(field.id, "name", e.target.value)}
+                               className={fieldNameError ? "border-destructive" : ""}
+                               aria-describedby={fieldNameError ? nameErrorId : undefined}
+                               aria-invalid={!!fieldNameError}
+                             />
+                             {fieldNameError && <p id={nameErrorId} className="text-xs text-destructive">{fieldNameError}</p>}
+                           </div>
+                           <div className="grid gap-2">
+                             <Label htmlFor={`field-type-${field.id}`}>Field Type</Label>
+                             <Select value={field.type} onValueChange={(value) => updateField(field.id, "type", value as FieldType)}>
+                               <SelectTrigger id={`field-type-${field.id}`} aria-label="Select field type">
+                                 <SelectValue placeholder="Select type" />
+                               </SelectTrigger>
+                               <SelectContent>
+                                 {FIELD_TYPES_CREATE.map((type) => (
+                                   <SelectItem key={type} value={type}>{type.charAt(0).toUpperCase() + type.slice(1)}</SelectItem>
+                                 ))}
+                               </SelectContent>
+                             </Select>
+                           </div>
+                         </div>
+                         <div className="flex items-center gap-2 pt-2">
+                           <Switch
+                             id={`field-required-${field.id}`}
+                             checked={field.required}
+                             onCheckedChange={(checked) => updateField(field.id, "required", checked)}
+                             aria-labelledby={`field-required-label-${field.id}`}
+                           />
+                           <Label htmlFor={`field-required-${field.id}`} id={`field-required-label-${field.id}`}>Required</Label>
+                         </div>
+                       </div>
+                   );
+               })}
+               <Button variant="outline" onClick={addField} className="mt-2">
+                 <Plus className="mr-2 h-4 w-4" />Add Field
+               </Button>
+             </CardContent>
+             <CardFooter className="flex justify-end gap-2">
+               <Button variant="outline" asChild><Link href="/tables">Cancel</Link></Button>
+               <Button onClick={handleCreateTable} disabled={isSubmitting}>
+                 {isSubmitting ? <><RefreshCw className="mr-2 h-4 w-4 animate-spin" />Creating...</> : "Create Table"}
+               </Button>
+             </CardFooter>
+           </Card>
+        </div>
+      </main>
+    </div>
+  );
+}
+// --- End CreateTablePage Refactor ---
+
+
+/******************************************************************************
+ * components/enhanced-select.tsx (Refactored Component)
+ ******************************************************************************/
+"use client"
+
+// Imports handled globally
+
+// Constants
+const ADD_NEW_VALUE_ENHANCED = "__add_new__"; // Renamed
+const DEFAULT_PLACEHOLDER_ENHANCED = "Select..."; // Renamed
+
+// Type definitions
+// type SafeValue = string | number | boolean | Date | object | null | undefined; // Defined above
+interface EnhancedSelectProps<T extends SafeValue> {
+  id: string;
+  label: string;
+  value: T; // Can be complex type
+  options: T[]; // Array of complex types or strings/numbers
+  getOptionValue?: (option: T) => string; // Function to get the string value for <option value="...">
+  getOptionLabel?: (option: T) => string; // Function to get the string label for display
+  onValueChange: (selectedValue: string) => void; // Returns the string value of the selected option
+  onAddOption?: (newLabel: string) => void; // Optional: Callback to handle adding a new option (by label)
+  required?: boolean;
+  placeholder?: string;
+  error?: string;
+  disabled?: boolean;
+  maxOptions?: number; // Primarily relevant if onAddOption is provided
+}
+
+// Default helpers if not provided
+const defaultGetOptionValue = (option: SafeValue): string => safeToString(option);
+const defaultGetOptionLabel = (option: SafeValue): string => safeToString(option);
+
+export const EnhancedSelect = memo(function EnhancedSelect<T extends SafeValue>({
+  id,
+  label,
+  value,
+  options = [],
+  getOptionValue = defaultGetOptionValue, // Use defaults
+  getOptionLabel = defaultGetOptionLabel, // Use defaults
+  onValueChange,
+  onAddOption, // Optional callback
+  required = false,
+  placeholder = DEFAULT_PLACEHOLDER_ENHANCED,
+  error,
+  disabled = false,
+  maxOptions = Number.POSITIVE_INFINITY,
+}: EnhancedSelectProps<T>) {
+  const [isAddingNew, setIsAddingNew] = useState(false);
+  const [newOptionLabel, setNewOptionLabel] = useState(""); // Store the label being added
+  const [validationError, setValidationError] = useState("");
+
+  // Convert current complex value to its string representation for the <select> value
+  const currentSelectValue = value !== null && value !== undefined ? getOptionValue(value) : "";
+
+  // Generate options for the select dropdown
+  const selectOptions = useMemo(() => {
+    return options.map((option, index) => ({
+      value: getOptionValue(option),
+      label: getOptionLabel(option),
+      key: `${id}-opt-${getOptionValue(option)}-${index}` // More robust key
+    }));
+  }, [options, getOptionValue, getOptionLabel, id]);
+
+  // Check if the "Add new" option should be available
+  const canAddNew = !!onAddOption && !disabled && selectOptions.length < maxOptions;
+
+  // Handle adding a new option via the dialog
+  const handleAddOptionConfirm = useCallback(() => {
+    const trimmedLabel = newOptionLabel.trim();
+    setValidationError("");
+
+    if (!trimmedLabel) {
+      setValidationError("Please enter a label for the new option.");
+      return;
+    }
+    // Check if an option with the same LABEL already exists
+    if (selectOptions.some(opt => opt.label === trimmedLabel)) {
+      setValidationError("An option with this label already exists.");
+      return;
+    }
+
+    if (onAddOption) {
+        onAddOption(trimmedLabel); // Call the provided handler
+        // It's the responsibility of the parent component (using onAddOption)
+        // to update the `options` prop and potentially select the new value.
+        setIsAddingNew(false);
+        setNewOptionLabel("");
+    } else {
+        console.error("onAddOption callback is missing, cannot add new option.");
+        setValidationError("Cannot add option: Configuration error.");
+    }
+
+  }, [newOptionLabel, onAddOption, selectOptions]); // Add dependencies
+
+  // Handle dialog escape key
+   const handleDialogKeyDown = useCallback((e: KeyboardEvent) => {
+       if (e.key === "Escape") {
+           setIsAddingNew(false);
+           e.preventDefault();
+       }
+   }, []);
+
+
+   useEffect(() => {
+       if (isAddingNew) document.addEventListener("keydown", handleDialogKeyDown);
+       else document.removeEventListener("keydown", handleDialogKeyDown);
+       return () => document.removeEventListener("keydown", handleDialogKeyDown);
+   }, [isAddingNew, handleDialogKeyDown]);
+
+
+  return (
+    <>
+      <Select
+        value={currentSelectValue} // Controlled component using string value
+        onValueChange={(selectedValue) => {
+          if (selectedValue === ADD_NEW_VALUE_ENHANCED) {
+            if (canAddNew) {
+                setValidationError("");
+                setNewOptionLabel("");
+                setIsAddingNew(true);
+            } else if (!onAddOption) {
+                 toastMock({ title: "Info", description: "Adding options is not configured for this select." });
+             } else if (disabled) {
+                  toastMock({ title: "Info", description: "Select is disabled." });
+             } else {
+                 toastMock({ title: "Limit Reached", description: `Maximum options (${maxOptions}) reached.` });
+             }
+          } else {
+            onValueChange(selectedValue); // Notify parent of the selected *value* string
+          }
+        }}
+        disabled={disabled}
+      >
+        <SelectTrigger
+          id={id}
+          aria-invalid={!!error} // Only show external error state on trigger
+          className={error ? "border-destructive" : ""}
+          aria-label={label}
+        >
+          {/* Display the label of the current value, or placeholder */}
+          <SelectValue placeholder={placeholder}>
+            {value !== null && value !== undefined ? getOptionLabel(value) : placeholder}
+          </SelectValue>
+        </SelectTrigger>
+        <SelectContent>
+           {/* Optional: Add a non-selectable placeholder item */}
+           {/* <SelectItem value="" disabled>{placeholder}</SelectItem> */}
+
+          {/* Render actual options */}
+          {selectOptions.map(opt => (
+            <SelectItem key={opt.key} value={opt.value}>
+              {opt.label}
+            </SelectItem>
+          ))}
+
+          {/* "Add new" option */}
+          {canAddNew && (
+            <SelectItem
+              value={ADD_NEW_VALUE_ENHANCED}
+              className="text-primary font-medium" // Mock class
+              aria-label={`Add new ${label.toLowerCase()}`}
+            >
+               <div style={{ display: 'flex', alignItems: 'center' }}>
+                 <Plus className="mr-2 h-4 w-4" /> Add new...
+               </div>
+            </SelectItem>
+          )}
+           {/* Indicate max options reached */}
+           {!disabled && !!onAddOption && selectOptions.length >= maxOptions && (
+               <SelectItem value="" disabled className="text-muted-foreground">Max options reached</SelectItem>
+           )}
+        </SelectContent>
+      </Select>
+       {/* Display external error message */}
+       {error && <p className="text-xs text-destructive mt-1">{error}</p>}
+
+
+      {/* Dialog for adding (only if onAddOption is provided) */}
+      {!!onAddOption && (
+          <Dialog open={isAddingNew} onOpenChange={setIsAddingNew}>
+            <DialogContent className="sm:max-w-[425px]">
+              <DialogHeader>
+                <DialogTitle>Add New {label}</DialogTitle>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div className="grid gap-2">
+                  <Label htmlFor={`new-option-label-${id}`}>New Option Label</Label>
+                  <Input
+                    id={`new-option-label-${id}`}
+                    value={newOptionLabel}
+                    onChange={(e) => { setNewOptionLabel(e.target.value); setValidationError(""); }}
+                    placeholder={`Enter label for new ${label.toLowerCase()}`}
+                    className={validationError ? "border-destructive" : ""}
+                    autoFocus
+                    onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleAddOptionConfirm(); } }}
+                  />
+                  {validationError && <p className="text-xs text-destructive">{validationError}</p>}
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setIsAddingNew(false)}>Cancel</Button>
+                <Button onClick={handleAddOptionConfirm}>Add Option</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+       )}
+    </>
+  );
+}) as <T extends SafeValue>(props: EnhancedSelectProps<T>) => JSX.Element;
+// --- End EnhancedSelect Refactor ---
+
+
+/******************************************************************************
+ * components/relationship-select.tsx (Refactored Component)
+ ******************************************************************************/
+"use client"
+
+// Imports handled globally
+
+// Constants
+// const ADD_NEW_VALUE_REL = "__add_new__"; // Not typically used here
+const DEFAULT_PLACEHOLDER_REL = "Select Relationship...";
+
+// Type definitions
+// type SafeValue = string | number | boolean | Date | object | null | undefined; // Defined above
+interface ParentFieldRel { id: string; value: string; } // Defined above
+interface RelationshipSelectProps {
+  id: string;
+  label: string;
+  value: SafeValue; // The *value* stored (e.g., the ID or unique name from the related table)
+  sourceTable: string; // The table ID to fetch options from
+  sourceField: string; // The field in the source table to use for option *labels* and potentially *values* if different
+  valueField?: string; // Optional: The field in the source table to use for option *values* (defaults to sourceField if omitted)
+  parentField?: ParentFieldRel; // For cascading filters
+  onValueChange: (selectedValue: string) => void; // Returns the *value* of the selected relationship
+  required?: boolean;
+  placeholder?: string;
+  error?: string;
+  disabled?: boolean;
+  // allowAddNew removed - adding should happen via the source table's UI, not directly here.
+}
+
+export const RelationshipSelect = memo(function RelationshipSelect({
+  id,
+  label,
+  value, // This should be the *value* (e.g., ID) stored for the relationship
+  sourceTable,
+  sourceField, // Field for the display Label
+  valueField, // Field for the actual Value (often an ID)
+  parentField, // TODO: Implement filtering based on parentField
+  onValueChange,
+  required = false,
+  placeholder = DEFAULT_PLACEHOLDER_REL,
+  error,
+  disabled = false,
+}: RelationshipSelectProps) {
+
+  const [options, setOptions] = useState<{ value: string, label: string }[]>([]); // Store {value, label} pairs
+  const [isLoading, setIsLoading] = useState(false);
+
+  const actualValueField = valueField || sourceField; // Use sourceField as value if valueField is not specified
+
+  // Load options from the source table/field
+  useEffect(() => {
+    let isMounted = true;
+    setIsLoading(true);
+    setOptions([]); // Clear previous options
+
+    const fetchOptions = async () => {
+        try {
+            // Fetch the full data from the related table
+            // Use timestamp 0 for now, assuming cache invalidation handles updates elsewhere
+            const relatedData = getRelatedTableData(sourceTable, cacheInvalidationTimestamps[sourceTable] || 0);
+
+            // TODO: Implement filtering based on parentField if provided
+            let filteredData = relatedData;
+             if (parentField && parentField.value && parentField.id) {
+                 console.log(`Filtering ${sourceTable} by ${parentField.id} = ${parentField.value}`);
+                 filteredData = relatedData.filter(record => safeToString(record[parentField.id]) === parentField.value);
+             } else {
+                 console.log(`No parent filter applied to ${sourceTable}`);
+             }
+
+
+            // Map data to { value, label } format, ensuring uniqueness based on value
+            const uniqueOptionsMap = new Map<string, string>();
+            filteredData.forEach(record => {
+                const optionValue = safeToString(record[actualValueField]);
+                const optionLabel = safeToString(record[sourceField]);
+                // Add if value is present and not already added
+                if (optionValue && !uniqueOptionsMap.has(optionValue)) {
+                    uniqueOptionsMap.set(optionValue, optionLabel || optionValue); // Use value as label if label field is empty
+                }
+            });
+
+            // Convert map to array and sort by label
+            const newOptions = Array.from(uniqueOptionsMap.entries())
+                .map(([value, label]) => ({ value, label }))
+                .sort((a, b) => a.label.localeCompare(b.label));
+
+
+            if (isMounted) {
+                setOptions(newOptions);
+            }
+        } catch (e) {
+            console.error(`Error fetching relationship options for ${sourceTable}.${sourceField}:`, e);
+             if (isMounted) {
+                 sonnerToastMock.error("Failed to load relationship options", { description: `Could not fetch options for ${label}.` });
+             }
+        } finally {
+            if (isMounted) setIsLoading(false);
+        }
+    };
+
+
+    fetchOptions();
+
+    return () => { isMounted = false; };
+  }, [sourceTable, sourceField, actualValueField, label, parentField?.id, parentField?.value]); // Re-fetch if dependencies change
+
+
+  // Convert the stored value (which should match an option's value) to string for the select
+  const currentSelectValue = safeToString(value);
+
+  return (
+    <>
+      <Select
+        value={currentSelectValue || ""} // Use the stringified stored value
+        onValueChange={(selectedValue) => {
+            // selectedValue is the *value* (e.g., ID) from the <option>
+            onValueChange(selectedValue);
+        }}
+        disabled={disabled || isLoading}
+      >
+        <SelectTrigger
+          id={id}
+          aria-invalid={!!error}
+          className={error ? "border-destructive" : ""}
+          aria-label={label}
+        >
+          <SelectValue placeholder={placeholder}>
+            {isLoading ? "Loading..." : (
+                // Find the label corresponding to the current value for display
+                options.find(opt => opt.value === currentSelectValue)?.label || placeholder
+            )}
+          </SelectValue>
+        </SelectTrigger>
+        <SelectContent>
+           {/* Placeholder */}
+           {/* <SelectItem value="" disabled>{placeholder}</SelectItem> */}
+
+          {isLoading ? (
+            <SelectItem value="" disabled>Loading options...</SelectItem>
+          ) : (
+            options.length === 0 ? (
+              <SelectItem value="" disabled>No options available</SelectItem>
+            ) : (
+              options.map((opt) => (
+                <SelectItem key={`${id}-opt-${opt.value}`} value={opt.value}>
+                  {opt.label} {/* Display label */}
+                </SelectItem>
+              ))
+            )
+          )}
+           {/* "Add new" is generally not appropriate here */}
+        </SelectContent>
+      </Select>
+      {error && <p className="text-xs text-destructive mt-1">{error}</p>}
+    </>
+  );
+});
+// --- End RelationshipSelect Refactor ---
+
