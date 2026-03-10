@@ -102,56 +102,52 @@ function ErrorFallback({ error }: { error: Error }) {
 
 function ClientLayoutComponent({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body>
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
-          <ErrorBoundary FallbackComponent={ErrorFallback}>
-            <DataContextProvider>
-              <div className="flex min-h-screen flex-col">
-                <header className="bg-background border-b">
-                  <div className="container flex h-16 items-center px-4 md:px-6">
-                    <div className="flex items-center gap-3">
-                      <Button variant="ghost" size="sm" asChild>
-                        <Link href="/dashboard" className="flex items-center gap-2">
-                          <span className="text-lg">🥷</span>
-                          <span className="sr-only">Home</span>
-                        </Link>
-                      </Button>
-                      <Link href="/" className="text-lg font-semibold">
-                        Apparel Supply Chain Tracker
-                      </Link>
-                    </div>
-                    <nav className="ml-auto flex gap-4 sm:gap-6 items-center">
-                      <Link href="/dashboard" className="text-sm font-medium hover:underline underline-offset-4">
-                        Dashboard
-                      </Link>
-                      <Link href="/tables" className="text-sm font-medium hover:underline underline-offset-4">
-                        Tables
-                      </Link>
-                      <Link href="/analytics" className="text-sm font-medium hover:underline underline-offset-4">
-                        Analytics
-                      </Link>
-                      <Button variant="outline" size="sm" asChild>
-                        <Link href="/dashboard">
-                          <Home className="h-4 w-4 mr-2" />
-                          Home
-                        </Link>
-                      </Button>
-                    </nav>
-                  </div>
-                </header>
-                <main className="flex-1">
-                  <DataPersistenceInitializer />
-                  <DataRecoveryNotification />
-                  {children}
-                </main>
+    <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+      <ErrorBoundary FallbackComponent={ErrorFallback}>
+        <DataContextProvider>
+          <div className="flex min-h-screen flex-col">
+            <header className="bg-background border-b">
+              <div className="container flex h-16 items-center px-4 md:px-6">
+                <div className="flex items-center gap-3">
+                  <Button variant="ghost" size="sm" asChild>
+                    <Link href="/dashboard" className="flex items-center gap-2">
+                      <span className="text-lg" role="img" aria-label="Ninja">&#x1F977;</span>
+                      <span className="sr-only">Home</span>
+                    </Link>
+                  </Button>
+                  <Link href="/" className="text-lg font-semibold">
+                    Apparel Supply Chain Tracker
+                  </Link>
+                </div>
+                <nav className="ml-auto flex gap-4 sm:gap-6 items-center">
+                  <Link href="/dashboard" className="text-sm font-medium hover:underline underline-offset-4">
+                    Dashboard
+                  </Link>
+                  <Link href="/tables" className="text-sm font-medium hover:underline underline-offset-4">
+                    Tables
+                  </Link>
+                  <Link href="/analytics" className="text-sm font-medium hover:underline underline-offset-4">
+                    Analytics
+                  </Link>
+                  <Button variant="outline" size="sm" asChild>
+                    <Link href="/dashboard">
+                      <Home className="h-4 w-4 mr-2" />
+                      Home
+                    </Link>
+                  </Button>
+                </nav>
               </div>
-              <SonnerProvider />
-            </DataContextProvider>
-          </ErrorBoundary>
-        </ThemeProvider>
-      </body>
-    </html>
+            </header>
+            <main className="flex-1">
+              <DataPersistenceInitializer />
+              <DataRecoveryNotification />
+              {children}
+            </main>
+          </div>
+          <SonnerProvider />
+        </DataContextProvider>
+      </ErrorBoundary>
+    </ThemeProvider>
   )
 }
 

@@ -360,3 +360,17 @@ export function getFieldDisplayValue(field: TableField, value: any, allRecords?:
 
 // Export tables as an alias for predefinedTables to maintain compatibility
 export const tables = predefinedTables
+
+// Get field options for a specific field
+export function getFieldOptions(tableId: string, fieldId: string): string[] {
+  const table = predefinedTables.find((t) => t.id === tableId)
+  if (!table) return []
+  
+  const field = table.fields.find((f) => f.id === fieldId)
+  return field?.options || []
+}
+
+// Get table by ID
+export function getTableById(tableId: string): TableSchema | undefined {
+  return predefinedTables.find((t) => t.id === tableId)
+}

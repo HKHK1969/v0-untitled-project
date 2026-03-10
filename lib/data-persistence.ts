@@ -311,6 +311,21 @@ export function loadData(tableId: string): any[] {
   }
 }
 
+// Save Data
+export function saveData(tableId: string, data: any[]): boolean {
+  if (typeof window === "undefined") return false
+
+  try {
+    localStorage.setItem(`table_${tableId}_data`, JSON.stringify(data))
+    // Trigger backup after save
+    backupAllData()
+    return true
+  } catch (e) {
+    console.error(`Error saving table data for ${tableId}:`, e)
+    return false
+  }
+}
+
 // Get Local Data
 export function getLocalData(): any {
   if (typeof window === "undefined") return null

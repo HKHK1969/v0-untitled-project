@@ -1,8 +1,8 @@
 import type React from "react"
 import type { Metadata } from "next"
 import { ClientLayout } from "./ClientLayout"
+import "./globals.css"
 
-// Dynamic metadata hook (Recommendation 1)
 export const metadata: Metadata = {
   title: "Apparel Supply Chain Tracker",
   description: "Track your apparel supply chain from design to delivery",
@@ -17,8 +17,11 @@ interface RootLayoutProps {
 }
 
 export default function RootLayout({ children }: RootLayoutProps) {
-  return <ClientLayout>{children}</ClientLayout>
+  return (
+    <html lang="en" suppressHydrationWarning>
+      <body>
+        <ClientLayout>{children}</ClientLayout>
+      </body>
+    </html>
+  )
 }
-
-
-import './globals.css'
