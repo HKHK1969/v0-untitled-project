@@ -10,6 +10,7 @@ import { DataRecoveryNotification } from "@/components/data-recovery-notificatio
 import { DataPersistenceInitializer } from "@/components/data-persistence-initializer"
 import { Button } from "@/components/ui/button"
 import { SonnerProvider } from "@/components/sonner-provider"
+import { AIAssistant } from "@/components/ai-assistant"
 
 // Constants
 const LOADING_DELAY = 500 // ms, for simulating loading
@@ -126,6 +127,7 @@ const ClientLayoutComponent: React.FC<ClientLayoutProps> = ({ children }) => {
                 <DataRecoveryNotification />
                 <DataPersistenceInitializer />
                 <SonnerProvider />
+                <AIAssistant />
               </Suspense>
             </DataContextProvider>
           </ThemeProvider>
