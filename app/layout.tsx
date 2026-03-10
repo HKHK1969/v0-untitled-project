@@ -1,10 +1,13 @@
 import type React from "react"
 import type { Metadata } from "next"
-import { ClientLayout } from "./ClientLayout"
+import { Inter } from "next/font/google"
+import "./globals.css"
+import { ClientProviders } from "./ClientLayout"
 
-// Dynamic metadata hook (Recommendation 1)
+const inter = Inter({ subsets: ["latin"] })
+
 export const metadata: Metadata = {
-  title: "Apparel Supply Chain Tracker",
+  title: "Sourcing Ninja",
   description: "Track your apparel supply chain from design to delivery",
   icons: {
     icon: "/favicon.ico",
@@ -17,8 +20,11 @@ interface RootLayoutProps {
 }
 
 export default function RootLayout({ children }: RootLayoutProps) {
-  return <ClientLayout>{children}</ClientLayout>
+  return (
+    <html lang="en">
+      <body className={inter.className}>
+        <ClientProviders>{children}</ClientProviders>
+      </body>
+    </html>
+  )
 }
-
-
-import './globals.css'
