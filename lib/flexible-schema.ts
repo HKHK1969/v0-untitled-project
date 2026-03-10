@@ -6,7 +6,6 @@
  */
 
 import { tables, type Field, type TableDefinition, type FieldType, getFieldOptions } from "@/lib/data-structure"
-import { memoize } from "lodash" // Optional, for memoization
 
 // Constants
 const FIELD_TYPES = [
@@ -245,17 +244,14 @@ export function addTable(
 }
 
 // Utility to fetch dynamic field options (Recommendation 1: Dynamic data support)
-export const fetchFieldOptions = memoize(
-  async (tableId: string, fieldId: string): Promise<string[]> => {
-    try {
-      return await getFieldOptions(tableId, fieldId) // Leverages dynamic support from data-structure.ts
-    } catch (error) {
-      console.error(`Error fetching options for ${tableId}.${fieldId}:`, error)
-      return []
-    }
-  },
-  (tableId, fieldId) => `${tableId}.${fieldId}`, // Cache key
-)
+export async function fetchFieldOptions(tableId: string, fieldId: string): Promise<string[]> {
+  try {
+    return await getFieldOptions(tableId, fieldId) // Leverages dynamic support from data-structure.ts
+  } catch (error) {
+    console.error(`Error fetching options for ${tableId}.${fieldId}:`, error)
+    return []
+  }
+}
 
 // Additional Recommendations Implementation:
 // 1. Dynamic Features: Added config with persistToDatabase and dynamic options support

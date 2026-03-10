@@ -7,7 +7,7 @@ import { Download, Upload, Copy } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
-import { toast } from "@/components/ui/use-toast"
+import { toast } from "sonner"
 import { tables, type TableDefinition } from "@/lib/data-structure"
 import { Input } from "@/components/ui/input"
 import {
@@ -73,11 +73,7 @@ export default function DataManagerPage(_props: DataManagerPageProps) {
       setAllData(loadedData)
     } catch (e) {
       console.error("Error loading data:", e)
-      toast({
-        title: "Error",
-        description: "Failed to load some data",
-        variant: "destructive",
-      })
+      toast.error("Failed to load some data")
     } finally {
       setIsLoading(false)
     }
@@ -93,18 +89,10 @@ export default function DataManagerPage(_props: DataManagerPageProps) {
     try {
       const dataStr = JSON.stringify(allData, null, 2)
       setExportedData(dataStr)
-      toast({
-        title: "Data Exported",
-        description: "Your data has been exported successfully.",
-        variant: "default",
-      })
+      toast.success("Your data has been exported successfully.")
     } catch (e) {
       console.error("Error exporting data:", e)
-      toast({
-        title: "Export Failed",
-        description: "An error occurred while exporting data",
-        variant: "destructive",
-      })
+      toast.error("An error occurred while exporting data")
     } finally {
       setTimeout(() => setIsProcessing(false), 500) // Simulated delay
     }
@@ -122,18 +110,10 @@ export default function DataManagerPage(_props: DataManagerPageProps) {
       a.download = `data-backup-${new Date().toISOString().split("T")[0]}.json`
       a.click()
       URL.revokeObjectURL(url)
-      toast({
-        title: "Download Started",
-        description: "Your data file is being downloaded.",
-        variant: "default",
-      })
+      toast.success("Your data file is being downloaded.")
     } catch (e) {
       console.error("Error downloading file:", e)
-      toast({
-        title: "Download Failed",
-        description: "Failed to download the data file",
-        variant: "destructive",
-      })
+      toast.error("Failed to download the data file")
     }
   }, [exportedData])
 
@@ -143,18 +123,10 @@ export default function DataManagerPage(_props: DataManagerPageProps) {
 
     try {
       await navigator.clipboard.writeText(exportedData)
-      toast({
-        title: "Copied",
-        description: "Data copied to clipboard.",
-        variant: "default",
-      })
+      toast.success("Data copied to clipboard.")
     } catch (e) {
       console.error("Error copying to clipboard:", e)
-      toast({
-        title: "Copy Failed",
-        description: "Failed to copy data to clipboard",
-        variant: "destructive",
-      })
+      toast.error("Failed to copy data to clipboard")
     }
   }, [exportedData])
 
@@ -166,18 +138,10 @@ export default function DataManagerPage(_props: DataManagerPageProps) {
       reader.onload = (event) => {
         const result = event.target?.result as string
         setImportData(result)
-        toast({
-          title: "File Loaded",
-          description: "JSON data loaded from file. Click Import to proceed.",
-          variant: "default",
-        })
+        toast.success("JSON data loaded from file. Click Import to proceed.")
       }
       reader.onerror = () => {
-        toast({
-          title: "File Read Error",
-          description: "Failed to read the file",
-          variant: "destructive",
-        })
+        toast.error("Failed to read the file")
       }
       reader.readAsText(file)
     }
@@ -207,11 +171,7 @@ export default function DataManagerPage(_props: DataManagerPageProps) {
   // Import data from JSON
   const handleImport = useCallback(() => {
     if (!importData.trim()) {
-      toast({
-        title: "Import Failed",
-        description: "Please provide data to import",
-        variant: "destructive",
-      })
+      toast.error("Please provide data to import")
       return
     }
 
@@ -228,11 +188,7 @@ export default function DataManagerPage(_props: DataManagerPageProps) {
         }
       })
 
-      toast({
-        title: "Data Imported",
-        description: "Data restored successfully. Refreshing...",
-        variant: "default",
-      })
+      toast.success("Data restored successfully. Refreshing...")
 
       window.dispatchEvent(new Event("storage"))
       setTimeout(() => {
@@ -241,11 +197,7 @@ export default function DataManagerPage(_props: DataManagerPageProps) {
       }, REFRESH_DELAY)
     } catch (e) {
       console.error("Import error:", e)
-      toast({
-        title: "Import Failed",
-        description: e instanceof Error ? e.message : "Invalid JSON data",
-        variant: "destructive",
-      })
+      toast.error(e instanceof Error ? e.message : "Invalid JSON data")
       setIsProcessing(false)
     }
     setShowConfirmImport(false)

@@ -30,7 +30,7 @@ import { Badge } from "@/components/ui/badge"
 import { getTableById, type TableDefinition } from "@/lib/data-structure"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { format } from "date-fns"
-import { toast } from "@/components/ui/use-toast"
+import { toast } from "sonner"
 
 // Interfaces
 interface Column {
