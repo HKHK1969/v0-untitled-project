@@ -246,6 +246,15 @@ export default function EditRecordPage({ params }: EditRecordPageProps) {
     [debouncedHandleInputChange],
   )
 
+  // Direct (non-debounced) handler for text inputs to avoid lag
+  const handleTextInputChange = useCallback(
+    (fieldId: string, value: string) => {
+      setFormData((prev) => ({ ...prev, [fieldId]: value }))
+      setErrors((prev) => ({ ...prev, [fieldId]: null }))
+    },
+    [],
+  )
+
   const addMultiValue = useCallback(
     (fieldId: string, value: string, setValue: (val: string) => void) => {
       if (!value.trim()) return
@@ -663,34 +672,34 @@ export default function EditRecordPage({ params }: EditRecordPageProps) {
 
       // Regular field rendering for other fields
       switch (field.type) {
-        case "text":
-          return (
-            <Input
-              id={field.id}
-              value={safeToString(formData[field.id])}
-              onChange={(e) => handleInputChange(field.id, e.target.value)}
-              required={field.required}
-              maxLength={field.maxLength}
-              aria-invalid={errors[field.id] ? "true" : "false"}
-            />
-          )
-        case "longtext":
-          return (
-            <Textarea
-              id={field.id}
-              value={safeToString(formData[field.id])}
-              onChange={(e) => handleInputChange(field.id, e.target.value)}
-              required={field.required}
-              aria-invalid={errors[field.id] ? "true" : "false"}
-            />
-          )
+      case "text":
+        return (
+          <Input
+            id={field.id}
+            value={safeToString(formData[field.id])}
+            onChange={(e) => handleTextInputChange(field.id, e.target.value)}
+            required={field.required}
+            maxLength={field.maxLength}
+            aria-invalid={errors[field.id] ? "true" : "false"}
+          />
+        )
+      case "longtext":
+        return (
+          <Textarea
+            id={field.id}
+            value={safeToString(formData[field.id])}
+            onChange={(e) => handleTextInputChange(field.id, e.target.value)}
+            required={field.required}
+            aria-invalid={errors[field.id] ? "true" : "false"}
+          />
+        )
         case "number":
           return (
             <Input
               id={field.id}
               type="number"
               value={safeToString(formData[field.id])}
-              onChange={(e) => handleInputChange(field.id, e.target.value)}
+              onChange={(e) => handleTextInputChange(field.id, e.target.value)}
               required={field.required}
               aria-invalid={errors[field.id] ? "true" : "false"}
             />
@@ -701,7 +710,7 @@ export default function EditRecordPage({ params }: EditRecordPageProps) {
               id={field.id}
               type="date"
               value={safeToString(formData[field.id])}
-              onChange={(e) => handleInputChange(field.id, e.target.value)}
+              onChange={(e) => handleTextInputChange(field.id, e.target.value)}
               required={field.required}
               aria-invalid={errors[field.id] ? "true" : "false"}
             />
@@ -712,7 +721,7 @@ export default function EditRecordPage({ params }: EditRecordPageProps) {
               id={field.id}
               type="email"
               value={safeToString(formData[field.id])}
-              onChange={(e) => handleInputChange(field.id, e.target.value)}
+              onChange={(e) => handleTextInputChange(field.id, e.target.value)}
               required={field.required}
               aria-invalid={errors[field.id] ? "true" : "false"}
             />
@@ -723,7 +732,7 @@ export default function EditRecordPage({ params }: EditRecordPageProps) {
               id={field.id}
               type="tel"
               value={safeToString(formData[field.id])}
-              onChange={(e) => handleInputChange(field.id, e.target.value)}
+              onChange={(e) => handleTextInputChange(field.id, e.target.value)}
               required={field.required}
               aria-invalid={errors[field.id] ? "true" : "false"}
             />
@@ -808,7 +817,7 @@ export default function EditRecordPage({ params }: EditRecordPageProps) {
                 step="0.01"
                 className="flex-1 ml-2"
                 value={safeToString(formData[field.id])}
-                onChange={(e) => handleInputChange(field.id, e.target.value)}
+                onChange={(e) => handleTextInputChange(field.id, e.target.value)}
                 required={field.required}
                 aria-invalid={errors[field.id] ? "true" : "false"}
               />
