@@ -715,6 +715,9 @@ export const tables: TableDefinition[] = rawTables.map((table) => ({
   fields: table.fields.map(validateField),
 }))
 
+// Alias for backwards compatibility
+export const tableDefinitions = tables
+
 // Memoized table lookup
 function memoize<T extends (...args: any[]) => any>(fn: T): T {
   const cache = new Map()

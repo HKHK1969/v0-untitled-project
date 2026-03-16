@@ -14,6 +14,7 @@ import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { toast } from "@/components/ui/use-toast"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { tableDefinitions } from "@/lib/data-structure"
 
 // Interfaces
 interface Column {
@@ -51,66 +52,27 @@ const FIELD_TYPES = [
   "image",
   "file",
   "dropdown",
+  "multivalue",
+  "formula",
 ] as const
 
 const DEBOUNCE_DELAY = 300 // ms
 
-// Sample data (should be moved to a separate data layer in production)
-const sampleData: Record<string, TableInfo> = {
-  customers: {
-    name: "Customers",
-    description: "Customer information and contacts",
-    columns: [
-      { id: "name", label: "Name", type: "text", required: true },
-      { id: "email", label: "Email", type: "email", required: true },
-      { id: "phone", label: "Phone", type: "phone", required: false },
-      { id: "address", label: "Address", type: "text", required: false },
-      { id: "city", label: "City", type: "text", required: false },
-      { id: "state", label: "State", type: "text", required: false },
-      { id: "zip", label: "Zip", type: "text", required: false },
-      { id: "country", label: "Country", type: "text", required: false },
-    ],
-  },
-  suppliers: {
-    name: "Suppliers",
-    description: "Supplier information and contacts",
-    columns: [
-      { id: "name", label: "Name", type: "text", required: true },
-      { id: "contact", label: "Contact Person", type: "text", required: true },
-      { id: "email", label: "Email", type: "email", required: true },
-      { id: "phone", label: "Phone", type: "phone", required: false },
-      { id: "materials", label: "Materials", type: "text", required: false },
-      { id: "location", label: "Location", type: "text", required: false },
-    ],
-  },
-  styles: {
-    name: "Styles",
-    description: "Product style information",
-    columns: [
-      { id: "styleNumber", label: "Style Number", type: "text", required: true },
-      { id: "name", label: "Name", type: "text", required: true },
-      { id: "category", label: "Category", type: "select", required: true },
-      { id: "season", label: "Season", type: "select", required: false },
-      { id: "fabricType", label: "Fabric Type", type: "text", required: false },
-      { id: "colors", label: "Colors", type: "text", required: false },
-      { id: "sizes", label: "Sizes", type: "text", required: false },
-    ],
-  },
-  tasks: {
-    name: "Tasks",
-    description: "Task management",
-    columns: [
-      { id: "date", label: "Date", type: "date", required: false },
-      { id: "customer", label: "Customer", type: "dropdown", required: false },
-      { id: "supplier", label: "Supplier", type: "dropdown", required: false },
-      { id: "style", label: "Style", type: "dropdown", required: false },
-      { id: "sampleOrder", label: "Sample Order", type: "dropdown", required: false },
-      { id: "customerPO", label: "Customer PO", type: "dropdown", required: false },
-      { id: "assignedTo", label: "Assigned to", type: "text", required: false },
-      { id: "urgency", label: "Urgency", type: "dropdown", required: false },
-      { id: "notes", label: "Notes", type: "longtext", required: false },
-    ],
-  },
+// Function to get table info from data-structure.ts
+function getTableInfoFromDefinitions(tableId: string): TableInfo | null {
+  const tableDef = tableDefinitions.find(t => t.id === tableId)
+  if (!tableDef) return null
+  
+  return {
+    name: tableDef.name,
+    description: tableDef.description || "",
+    columns: tableDef.fields.map(field => ({
+      id: field.id,
+      label: field.label,
+      type: field.type,
+      required: field.required || false,
+    })),
+  }
 }
 
 export default function TableSettingsPage({ params }: TableSettingsPageProps) {
@@ -123,12 +85,11 @@ export default function TableSettingsPage({ params }: TableSettingsPageProps) {
   const [isSaving, setIsSaving] = useState<boolean>(false)
   const [saveSuccess, setSaveSuccess] = useState<boolean>(false)
 
-  // Load table data
+  // Load table data from data-structure.ts
   const loadTableData = useCallback(() => {
     setIsLoading(true)
     try {
-      // In a real app, this would fetch from an API
-      const data = sampleData[tableId]
+      const data = getTableInfoFromDefinitions(tableId)
       if (data) {
         setTableInfo(data)
         setTableName(data.name)
@@ -241,8 +202,9 @@ export default function TableSettingsPage({ params }: TableSettingsPageProps) {
       // In production, save to API or persistent storage
       console.log("Saving table settings:", updatedTableInfo)
 
-      // Update local sample data (for demo purposes)
-      sampleData[tableId] = updatedTableInfo
+      // Note: Currently this only updates local state. 
+      // In production, this would save to the database.
+      // The data-structure.ts is the source of truth for field definitions.
 
       setSaveSuccess(true)
       toast({
