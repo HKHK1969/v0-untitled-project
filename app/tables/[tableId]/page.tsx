@@ -592,7 +592,7 @@ export default function TablePage() {
                         <TableRow 
                           key={record.id}
                           className="cursor-pointer hover:bg-muted/50"
-                          onDoubleClick={() => router.push(`/tables/${tableId}/edit/${record.id}`)}
+                          onClick={() => router.push(`/tables/${tableId}/edit/${record.id}`)}
                         >
                           {columns.map((column) => (
                             <TableCell key={`${record.id}-${column.id}`}>
