@@ -599,7 +599,7 @@ export default function TablePage() {
                               {renderCellValue(record[column.id], column.type)}
                             </TableCell>
                           ))}
-                          <TableCell>
+                          <TableCell onClick={(e) => e.stopPropagation()}>
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
                                 <Button variant="ghost" size="icon">
