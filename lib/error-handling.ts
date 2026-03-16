@@ -13,13 +13,15 @@ export class ErrorLogger {
   private static maxErrors = 50
 
   static logError(error: Error, additionalInfo?: Record<string, any>): void {
+    if (typeof window === "undefined") return
+    
     const errorInfo: ErrorInfo = {
       message: error.message,
       stack: error.stack,
       componentStack: additionalInfo?.componentStack,
       timestamp: Date.now(),
-      userAgent: navigator.userAgent,
-      url: window.location.href,
+      userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "unknown",
+      url: typeof window !== "undefined" ? window.location.href : "unknown",
       userId: additionalInfo?.userId,
       ...additionalInfo,
     }
@@ -30,11 +32,13 @@ export class ErrorLogger {
       this.errors.shift()
     }
 
-    try {
-      localStorage.setItem("app_errors", JSON.stringify(this.errors))
-    } catch (e) {
-      if (process.env.NODE_ENV === "development") {
-        console.warn("Failed to save error to localStorage:", e)
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem("app_errors", JSON.stringify(this.errors))
+      } catch (e) {
+        if (process.env.NODE_ENV === "development") {
+          console.warn("Failed to save error to localStorage:", e)
+        }
       }
     }
 
@@ -58,6 +62,7 @@ export class ErrorLogger {
   }
 
   static getErrors(): ErrorInfo[] {
+    if (typeof window === "undefined") return this.errors
     try {
       const stored = localStorage.getItem("app_errors")
       return stored ? JSON.parse(stored) : []
@@ -68,6 +73,7 @@ export class ErrorLogger {
 
   static clearErrors(): void {
     this.errors = []
+    if (typeof window === "undefined") return
     try {
       localStorage.removeItem("app_errors")
     } catch (e) {
