@@ -29,11 +29,11 @@ const FEATURE_CARDS = [
     linkText: "View Styles",
   },
   {
-    title: "Sample Orders",
-    description: "Manage your sample order database",
-    content: "Track sample order information and status",
-    link: "/tables/sampleOrders",
-    linkText: "View Sample Orders",
+    title: "Orders",
+    description: "Manage all your orders",
+    content: "Track sample requests and production orders",
+    link: "/orders",
+    linkText: "View Orders",
   },
 ]
 
