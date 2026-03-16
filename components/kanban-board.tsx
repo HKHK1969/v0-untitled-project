@@ -297,12 +297,36 @@ export function KanbanBoard({
 
     // Create columns based on statusConfig
     Object.entries(statusConfig).forEach(([statusId, config]) => {
+      let columnItems: KanbanItem[]
+      
+      if (statusId === "__unassigned__") {
+        // Unassigned column gets items without a status value
+        columnItems = items.filter((item) => {
+          const value = item[statusField]
+          return value === undefined || value === null || value === "" ||
+                 (Array.isArray(value) && value.length === 0)
+        })
+      } else if (statusId === "__all__") {
+        // All Items column gets everything
+        columnItems = [...items]
+      } else {
+        // Normal column matching
+        columnItems = items.filter((item) => {
+          const value = item[statusField]
+          // Handle array values (multi-value fields)
+          if (Array.isArray(value)) {
+            return value.includes(statusId)
+          }
+          return String(value) === statusId
+        })
+      }
+      
       cols.push({
         id: statusId,
         title: config.title,
         color: config.color,
         limit: config.limit,
-        items: items.filter((item) => item[statusField] === statusId),
+        items: columnItems,
       })
     })
 
