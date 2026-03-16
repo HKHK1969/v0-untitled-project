@@ -721,17 +721,17 @@ function renderCellValue(value, type) {
       return <Badge variant="outline">{value}</Badge>
     case "image":
       if (typeof value === "string" && value.trim()) {
-        console.log(
-          "[v0] Rendering image field, value length:",
-          value.length,
-          "starts with data:",
-          value.startsWith("data:"),
-        )
-
         let images: string[]
 
-        // If it's a data URL, treat it as a single image
-        if (value.startsWith("data:")) {
+        // Check if it's a JSON array of images
+        if (value.startsWith("[")) {
+          try {
+            images = JSON.parse(value)
+          } catch {
+            images = [value]
+          }
+        } else if (value.startsWith("data:")) {
+          // If it's a data URL, treat it as a single image
           images = [value]
         } else {
           // Otherwise, split by comma for multiple filenames
@@ -741,38 +741,37 @@ function renderCellValue(value, type) {
             .filter(Boolean)
         }
 
+        // Only show the first image in table list view
+        const firstImage = images[0]
+        if (!firstImage) return "-"
+        
+        const isDataUrl = firstImage.startsWith("data:")
+        const imgSrc = isDataUrl ? firstImage : `/images/${firstImage}`
+        const totalImages = images.length
+
         return (
-          <div className="flex gap-1 flex-wrap">
-            {images.map((img, index) => {
-              const isDataUrl = img.startsWith("data:")
-              const imgSrc = isDataUrl ? img : `/images/${img}`
-
-              console.log("[v0] Image", index, "- isDataUrl:", isDataUrl, "src:", isDataUrl ? "data URL" : imgSrc)
-
-              return (
-                <div key={index} className="relative w-12 h-12 rounded overflow-hidden border bg-muted">
-                  <img
-                    src={imgSrc || "/placeholder.svg"}
-                    alt={`Image ${index + 1}`}
-                    className="w-full h-full object-cover"
-                    onLoad={() => console.log("[v0] Image loaded successfully:", index)}
-                    onError={(e) => {
-                      console.log("[v0] Image failed to load:", index, "src:", isDataUrl ? "data URL" : imgSrc)
-                      // Show a "no image" placeholder instead of generic placeholder
-                      e.currentTarget.style.display = "none"
-                      const parent = e.currentTarget.parentElement
-                      if (parent && !parent.querySelector(".no-image-text")) {
-                        const noImageDiv = document.createElement("div")
-                        noImageDiv.className =
-                          "no-image-text flex items-center justify-center w-full h-full text-xs text-muted-foreground"
-                        noImageDiv.textContent = "No image"
-                        parent.appendChild(noImageDiv)
-                      }
-                    }}
-                  />
-                </div>
-              )
-            })}
+          <div className="flex items-center gap-2">
+            <div className="relative w-12 h-12 rounded overflow-hidden border bg-muted">
+              <img
+                src={imgSrc || "/placeholder.svg"}
+                alt="Image 1"
+                className="w-full h-full object-cover"
+                onError={(e) => {
+                  e.currentTarget.style.display = "none"
+                  const parent = e.currentTarget.parentElement
+                  if (parent && !parent.querySelector(".no-image-text")) {
+                    const noImageDiv = document.createElement("div")
+                    noImageDiv.className =
+                      "no-image-text flex items-center justify-center w-full h-full text-xs text-muted-foreground"
+                    noImageDiv.textContent = "No img"
+                    parent.appendChild(noImageDiv)
+                  }
+                }}
+              />
+            </div>
+            {totalImages > 1 && (
+              <span className="text-xs text-muted-foreground">+{totalImages - 1}</span>
+            )}
           </div>
         )
       }

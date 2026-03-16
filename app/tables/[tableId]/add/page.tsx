@@ -861,41 +861,100 @@ export default function AddRecordPage({ params }: AddRecordPageProps) {
             </div>
           )
         case "image":
+          // Parse existing images from formData
+          const existingImagesRaw = formData[field.id]
+          let existingImages: string[] = []
+          if (existingImagesRaw) {
+            const rawStr = safeToString(existingImagesRaw)
+            if (rawStr.startsWith("[")) {
+              try {
+                existingImages = JSON.parse(rawStr)
+              } catch {
+                existingImages = rawStr ? [rawStr] : []
+              }
+            } else if (rawStr.startsWith("data:")) {
+              existingImages = [rawStr]
+            } else if (rawStr) {
+              existingImages = rawStr.split(",").map(s => s.trim()).filter(Boolean)
+            }
+          }
+          
+          const MAX_IMAGES = 10
+          const canAddMore = existingImages.length < MAX_IMAGES
+
           return (
             <div>
-              <div className="flex items-center gap-4">
-                <Input
-                  id={field.id}
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0]
-                    if (file) {
-                      handleInputChange(field.id, file)
-                    }
-                  }}
-                  required={field.required}
-                  aria-invalid={errors[field.id] ? "true" : "false"}
-                />
-              </div>
-
-              {imagePreview && (
-                <div className="mt-4">
-                  <p className="text-sm font-medium mb-2">Image Preview:</p>
-                  <div className="border rounded-md p-2 w-fit">
-                    <Image
-                      src={imagePreview || "/placeholder.svg"}
-                      alt="Preview"
-                      width={200}
-                      height={200}
-                      className="object-contain max-h-[200px]"
-                    />
-                  </div>
+              <p className="text-sm text-muted-foreground mb-2">
+                You can add up to {MAX_IMAGES} images. ({existingImages.length}/{MAX_IMAGES} added)
+              </p>
+              
+              {canAddMore && (
+                <div className="flex items-center gap-4">
+                  <Input
+                    id={field.id}
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={(e) => {
+                      const files = e.target.files
+                      if (files && files.length > 0) {
+                        const remainingSlots = MAX_IMAGES - existingImages.length
+                        const filesToAdd = Array.from(files).slice(0, remainingSlots)
+                        
+                        // Read all files and convert to data URLs
+                        const readPromises = filesToAdd.map(file => {
+                          return new Promise<string>((resolve) => {
+                            const reader = new FileReader()
+                            reader.onload = (ev) => {
+                              resolve(ev.target?.result as string)
+                            }
+                            reader.readAsDataURL(file)
+                          })
+                        })
+                        
+                        Promise.all(readPromises).then(newDataUrls => {
+                          const updatedImages = [...existingImages, ...newDataUrls]
+                          handleInputChange(field.id, JSON.stringify(updatedImages))
+                        })
+                      }
+                    }}
+                    required={field.required && existingImages.length === 0}
+                    aria-invalid={errors[field.id] ? "true" : "false"}
+                  />
                 </div>
               )}
 
-              {formData[field.id] && !imagePreview && (
-                <p className="text-xs text-muted-foreground mt-1">Selected: {safeToString(formData[field.id])}</p>
+              {/* Show current images */}
+              {existingImages.length > 0 && (
+                <div className="mt-4">
+                  <p className="text-sm font-medium mb-2">Images ({existingImages.length}):</p>
+                  <div className="flex flex-wrap gap-3">
+                    {existingImages.map((img, index) => (
+                      <div key={index} className="relative group">
+                        <div className="border rounded-md p-2 w-fit">
+                          <img
+                            src={img}
+                            alt={`Image ${index + 1}`}
+                            className="object-contain h-[120px] w-[120px]"
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const updatedImages = existingImages.filter((_, i) => i !== index)
+                            handleInputChange(field.id, updatedImages.length > 0 ? JSON.stringify(updatedImages) : "")
+                          }}
+                          className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full w-6 h-6 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          X
+                        </button>
+                        <p className="text-xs text-center text-muted-foreground mt-1">
+                          {index === 0 ? "Main" : `#${index + 1}`}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               )}
             </div>
           )
