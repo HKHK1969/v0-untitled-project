@@ -523,24 +523,32 @@ export default function EditRecordPage({ params }: EditRecordPageProps) {
             </Button>
           </div>
 
-          {(formData[field.id] as string[])?.length > 0 && (
-            <div className="flex flex-wrap gap-2 mt-2">
-              {(formData[field.id] as string[]).map((value, index) => (
-                <Badge key={index} variant="secondary" className="flex items-center gap-1">
-                  {safeToString(value)}
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-4 w-4 p-0 ml-1"
-                    onClick={() => removeMultiValue(field.id, index)}
-                  >
-                    <X className="h-3 w-3" />
-                    <span className="sr-only">Remove</span>
-                  </Button>
-                </Badge>
-              ))}
-            </div>
-          )}
+          {(() => {
+            const rawValue = formData[field.id]
+            const values = Array.isArray(rawValue) 
+              ? rawValue 
+              : (typeof rawValue === "string" && rawValue.trim() 
+                  ? rawValue.split(",").map(v => v.trim()).filter(Boolean)
+                  : [])
+            return values.length > 0 && (
+              <div className="flex flex-wrap gap-2 mt-2">
+                {values.map((value, index) => (
+                  <Badge key={index} variant="secondary" className="flex items-center gap-1">
+                    {safeToString(value)}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-4 w-4 p-0 ml-1"
+                      onClick={() => removeMultiValue(field.id, index)}
+                    >
+                      <X className="h-3 w-3" />
+                      <span className="sr-only">Remove</span>
+                    </Button>
+                  </Badge>
+                ))}
+              </div>
+            )
+          })()}
         </div>
       )
     },
