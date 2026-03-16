@@ -838,15 +838,14 @@ export default function EditRecordPage({ params }: EditRecordPageProps) {
                 <div className="mt-4">
                   <p className="text-sm font-medium mb-2">Current Image:</p>
                   <div className="border rounded-md p-2 w-fit">
-                    <Image
-                      src={`/ceholder-svg-key-czet2.jpg?key=czet2&height=200&width=200`}
+                    <img
+                      src={safeToString(formData[field.id])}
                       alt="Current image"
                       width={200}
                       height={200}
-                      className="object-contain max-h-[200px]"
+                      className="object-contain max-h-[200px] max-w-[200px]"
                     />
                   </div>
-                  <p className="text-xs text-muted-foreground mt-1">Filename: {safeToString(formData[field.id])}</p>
                 </div>
               )}
 
