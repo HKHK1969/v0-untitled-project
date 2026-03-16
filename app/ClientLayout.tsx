@@ -62,14 +62,24 @@ const DataContextProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Initialize accessibility features
   useEffect(() => {
-    AccessibilityManager.initialize()
-
-    // Announce app loading
-    AccessibilityManager.announceLoading(`Loading ${APP_NAME}`)
+    if (typeof window !== "undefined") {
+      try {
+        AccessibilityManager.initialize()
+        AccessibilityManager.announceLoading(`Loading ${APP_NAME}`)
+      } catch (e) {
+        console.warn("Accessibility initialization warning:", e)
+      }
+    }
 
     const timer = setTimeout(() => {
       setIsLoading(false)
-      AccessibilityManager.announceLoadingComplete(`${APP_NAME} is ready`)
+      if (typeof window !== "undefined") {
+        try {
+          AccessibilityManager.announceLoadingComplete(`${APP_NAME} is ready`)
+        } catch (e) {
+          // Silently ignore
+        }
+      }
     }, LOADING_DELAY)
 
     return () => clearTimeout(timer)
