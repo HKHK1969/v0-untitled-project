@@ -589,13 +589,17 @@ export default function TablePage() {
                       </TableRow>
                     ) : (
                       paginatedRecords.map((record) => (
-                        <TableRow key={record.id}>
+                        <TableRow 
+                          key={record.id} 
+                          className="cursor-pointer hover:bg-muted/50"
+                          onClick={() => router.push(`/tables/${tableId}/edit/${record.id}`)}
+                        >
                           {columns.map((column) => (
                             <TableCell key={`${record.id}-${column.id}`}>
                               {renderCellValue(record[column.id], column.type)}
                             </TableCell>
                           ))}
-                          <TableCell>
+                          <TableCell onClick={(e) => e.stopPropagation()}>
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
                                 <Button variant="ghost" size="icon">
