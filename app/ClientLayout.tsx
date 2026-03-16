@@ -10,10 +10,7 @@ import { SonnerProvider } from "@/components/sonner-provider"
 import { ErrorBoundary } from "@/components/error-boundary"
 import { AccessibilityManager } from "@/lib/accessibility-utils"
 import { ErrorLogger } from "@/lib/error-handling"
-import dynamic from "next/dynamic"
-
-// Dynamically import the AIAssistant with no SSR to avoid hydration issues
-const AIAssistant = dynamic(() => import("@/components/ai-assistant"), { ssr: false })
+import AIAssistant from "@/components/ai-assistant"
 
 // Constants
 const LOADING_DELAY = 500 // ms, for simulating loading
