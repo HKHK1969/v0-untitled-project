@@ -689,6 +689,9 @@ export default function TablePage() {
           priorityField={kanbanConfig.priorityField}
           assigneeField={kanbanConfig.assigneeField}
           tagsField={kanbanConfig.tagsField}
+          imageField={kanbanConfig.imageField}
+          extraFields={kanbanConfig.extraFields}
+          sortOrder={kanbanConfig.sortOrder}
           onItemMove={handleKanbanCardUpdate}
           getItemUrl={(id: string) => `/tables/${tableId}/edit/${id}`}
         />

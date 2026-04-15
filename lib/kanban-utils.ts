@@ -19,6 +19,9 @@ export const KANBAN_CONFIGS: Record<string, any> = {
     statusConfig: {}, // Will be dynamically populated
     titleField: "styleCode",
     descriptionField: "styleDescription",
+    imageField: "image",
+    extraFields: ["fabric", "season"],
+    sortOrder: "oldest-bottom", // Show oldest items at bottom
   },
   sampleOrders: {
     statusField: "sampleType", // Group by sample type

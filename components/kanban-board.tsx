@@ -53,6 +53,9 @@ interface KanbanBoardProps {
   priorityField?: string
   assigneeField?: string
   tagsField?: string
+  imageField?: string
+  extraFields?: string[]
+  sortOrder?: "newest-top" | "oldest-bottom"
 }
 
 // Drag item type
@@ -69,6 +72,8 @@ const KanbanCard = ({
   priorityField,
   assigneeField,
   tagsField,
+  imageField,
+  extraFields,
 }: {
   item: KanbanItem
   getItemUrl: (itemId: string) => string
@@ -79,6 +84,8 @@ const KanbanCard = ({
   priorityField?: string
   assigneeField?: string
   tagsField?: string
+  imageField?: string
+  extraFields?: string[]
 }) => {
   const [{ isDragging }, drag] = useDrag(() => ({
     type: ITEM_TYPE,
@@ -112,6 +119,30 @@ const KanbanCard = ({
       onKeyDown={handleKeyDown}
     >
       <Card className="shadow-sm hover:shadow transition-shadow">
+        {/* Image display */}
+        {imageField && item[imageField] && (
+          <div className="w-full h-24 overflow-hidden rounded-t-lg">
+            {(() => {
+              const imgValue = item[imageField]
+              let imgSrc = ""
+              if (typeof imgValue === "string") {
+                if (imgValue.startsWith("[")) {
+                  try {
+                    const parsed = JSON.parse(imgValue)
+                    imgSrc = Array.isArray(parsed) && parsed.length > 0 ? parsed[0] : ""
+                  } catch {
+                    imgSrc = imgValue
+                  }
+                } else {
+                  imgSrc = imgValue
+                }
+              }
+              return imgSrc ? (
+                <img src={imgSrc} alt="" className="w-full h-full object-cover" />
+              ) : null
+            })()}
+          </div>
+        )}
         <CardHeader className="p-3 pb-0">
           <div className="flex justify-between items-start">
             <CardTitle className="text-sm font-medium line-clamp-2">{item[titleField]}</CardTitle>
@@ -161,6 +192,21 @@ const KanbanCard = ({
               Assigned to: {item[assigneeField]}
             </div>
           )}
+          {/* Extra fields display */}
+          {extraFields && extraFields.length > 0 && (
+            <div className="space-y-1 mt-1">
+              {extraFields.map((fieldName) => {
+                const value = item[fieldName]
+                if (!value) return null
+                const displayValue = Array.isArray(value) ? value.join(", ") : String(value)
+                return (
+                  <div key={fieldName} className="text-xs text-muted-foreground truncate">
+                    <span className="capitalize">{fieldName}:</span> {displayValue}
+                  </div>
+                )
+              })}
+            </div>
+          )}
         </CardContent>
         <CardFooter className="p-3 pt-0 flex flex-wrap gap-1">
           {priorityField && item[priorityField] && (
@@ -202,6 +248,8 @@ const KanbanColumn = ({
   priorityField,
   assigneeField,
   tagsField,
+  imageField,
+  extraFields,
 }: {
   column: KanbanColumn
   onItemMove: (itemId: string, newStatus: string) => void
@@ -212,6 +260,8 @@ const KanbanColumn = ({
   priorityField?: string
   assigneeField?: string
   tagsField?: string
+  imageField?: string
+  extraFields?: string[]
 }) => {
   const [{ isOver }, drop] = useDrop(() => ({
     accept: ITEM_TYPE,
@@ -264,6 +314,8 @@ const KanbanColumn = ({
               priorityField={priorityField}
               assigneeField={assigneeField}
               tagsField={tagsField}
+              imageField={imageField}
+              extraFields={extraFields}
             />
           </div>
         ))}
@@ -290,6 +342,9 @@ export function KanbanBoard({
   priorityField,
   assigneeField,
   tagsField,
+  imageField,
+  extraFields,
+  sortOrder = "newest-top",
 }: KanbanBoardProps) {
   // Organize items into columns
   const columns = useMemo(() => {
@@ -321,17 +376,33 @@ export function KanbanBoard({
         })
       }
       
+      // Sort items based on sortOrder (by id which contains timestamp)
+      const sortedItems = [...columnItems].sort((a, b) => {
+        const aId = String(a.id)
+        const bId = String(b.id)
+        // Extract timestamp from id (format: timestamp-randomstring)
+        const aTime = parseInt(aId.split("-")[0]) || 0
+        const bTime = parseInt(bId.split("-")[0]) || 0
+        
+        if (sortOrder === "oldest-bottom") {
+          // Newest first (oldest at bottom)
+          return bTime - aTime
+        }
+        // Default: newest first
+        return bTime - aTime
+      })
+      
       cols.push({
         id: statusId,
         title: config.title,
         color: config.color,
         limit: config.limit,
-        items: columnItems,
+        items: sortedItems,
       })
     })
 
     return cols
-  }, [items, statusField, statusConfig])
+  }, [items, statusField, statusConfig, sortOrder])
 
   return (
     <DndProvider backend={HTML5Backend}>
@@ -352,6 +423,8 @@ export function KanbanBoard({
             priorityField={priorityField}
             assigneeField={assigneeField}
             tagsField={tagsField}
+            imageField={imageField}
+            extraFields={extraFields}
           />
         ))}
       </div>
