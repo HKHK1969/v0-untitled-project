@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/alert-dialog"
 
 // Interfaces
-type DataManagerPageProps = {}
+type DataManagerPageProps = Record<string, unknown>
 
 interface StoredData {
   [key: string]: any

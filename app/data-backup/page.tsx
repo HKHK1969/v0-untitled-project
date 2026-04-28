@@ -226,7 +226,7 @@ export default function DataBackupPage() {
           <Card>
             <CardHeader>
               <CardTitle>Data Recovery Instructions</CardTitle>
-              <CardDescription>Follow these steps if you're experiencing data loss</CardDescription>
+              <CardDescription>Follow these steps if you&apos;re experiencing data loss</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
@@ -237,7 +237,7 @@ export default function DataBackupPage() {
                   <div>
                     <h3 className="font-medium">Create Regular Backups</h3>
                     <p className="text-sm text-muted-foreground">
-                      Click the "Backup Now" button regularly to save your current data state.
+                      Click the &quot;Backup Now&quot; button regularly to save your current data state.
                     </p>
                   </div>
                 </div>
@@ -249,7 +249,7 @@ export default function DataBackupPage() {
                   <div>
                     <h3 className="font-medium">Export Your Backups</h3>
                     <p className="text-sm text-muted-foreground">
-                      Use the "Export Backup" button to download your backup as a JSON file for safekeeping.
+                      Use the &quot;Export Backup&quot; button to download your backup as a JSON file for safekeeping.
                     </p>
                   </div>
                 </div>
@@ -261,7 +261,7 @@ export default function DataBackupPage() {
                   <div>
                     <h3 className="font-medium">Restore When Needed</h3>
                     <p className="text-sm text-muted-foreground">
-                      Upload your backup file and click "Import & Restore" to recover your data.
+                      Upload your backup file and click &quot;Import &amp; Restore&quot; to recover your data.
                     </p>
                   </div>
                 </div>
