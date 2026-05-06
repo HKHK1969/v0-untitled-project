@@ -3,6 +3,8 @@
 import { useState, useEffect, useCallback, memo, Suspense, createContext, useContext, useMemo } from "react"
 import type React from "react"
 import { Inter } from "next/font/google"
+import Link from "next/link"
+import { Palette, Users, Truck, Package, ClipboardList, FileBox } from "lucide-react"
 import { ThemeProvider } from "@/components/theme-provider"
 import { DataRecoveryNotification } from "@/components/data-recovery-notification"
 import { DataPersistenceInitializer } from "@/components/data-persistence-initializer"
@@ -11,6 +13,16 @@ import { ErrorBoundary } from "@/components/error-boundary"
 import { AccessibilityManager } from "@/lib/accessibility-utils"
 import { ErrorLogger } from "@/lib/error-handling"
 import AIAssistant from "@/components/ai-assistant"
+
+// Navigation items - Styles, Customers, Suppliers, Bulk Orders, Sample Orders, Tasks
+const NAV_ITEMS = [
+  { title: "Styles", icon: Palette, link: "/tables/styles", color: "text-purple-600" },
+  { title: "Customers", icon: Users, link: "/tables/customers", color: "text-blue-600" },
+  { title: "Suppliers", icon: Truck, link: "/tables/suppliers", color: "text-green-600" },
+  { title: "Bulk Orders", icon: FileBox, link: "/tables/productionOrders", color: "text-orange-600" },
+  { title: "Samples", icon: Package, link: "/tables/sampleOrders", color: "text-cyan-600" },
+  { title: "Tasks", icon: ClipboardList, link: "/tables/tasks", color: "text-red-600" },
+]
 
 // Constants
 const LOADING_DELAY = 500 // ms, for simulating loading
@@ -173,9 +185,26 @@ const ClientLayoutComponent: React.FC<ClientLayoutProps> = ({ children }) => {
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           <DataContextProvider>
             <Suspense fallback={<LoadingFallback />}>
-              {/* Main content wrapper */}
-              <div id="main-content" tabIndex={-1}>
-                {children}
+              <div className="flex h-screen overflow-hidden">
+                {/* Fixed Left Sidebar Navigation */}
+                <aside id="navigation" className="w-20 bg-card border-r flex flex-col items-center py-4 gap-2 shrink-0">
+                  <Link href="/" className="text-xs font-bold mb-4 text-center px-1 hover:text-primary">SN</Link>
+                  {NAV_ITEMS.map((item) => (
+                    <Link
+                      key={item.title}
+                      href={item.link}
+                      className="flex flex-col items-center justify-center w-16 h-14 rounded-lg hover:bg-muted transition-colors group"
+                    >
+                      <item.icon className={`h-5 w-5 ${item.color} group-hover:scale-110 transition-transform`} />
+                      <span className="text-[10px] mt-1 text-muted-foreground group-hover:text-foreground">{item.title}</span>
+                    </Link>
+                  ))}
+                </aside>
+
+                {/* Main content wrapper */}
+                <div id="main-content" tabIndex={-1} className="flex-1 overflow-auto">
+                  {children}
+                </div>
               </div>
 
               {/* Global components */}

@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { AlertTriangle, Clock, Calendar, Users, Package, Truck, Palette, ClipboardList } from "lucide-react"
+import { AlertTriangle, Clock, Calendar, Users } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 
@@ -23,42 +23,11 @@ const URGENT_ITEMS = {
   ],
 }
 
-const NAV_ITEMS = [
-  { title: "Customers", icon: Users, link: "/tables/customers", color: "text-blue-600" },
-  { title: "Suppliers", icon: Truck, link: "/tables/suppliers", color: "text-green-600" },
-  { title: "Styles", icon: Palette, link: "/tables/styles", color: "text-purple-600" },
-  { title: "Orders", icon: Package, link: "/orders", color: "text-orange-600" },
-  { title: "Tasks", icon: ClipboardList, link: "/tables/tasks", color: "text-red-600" },
-]
-
 export default function Home() {
   const appName = "Sourcing Ninja"
 
   return (
-    <div className="flex h-screen overflow-hidden">
-      {/* Left Sidebar Navigation */}
-      <aside className="w-20 bg-card border-r flex flex-col items-center py-4 gap-2 shrink-0">
-        <span className="text-xs font-bold mb-4 text-center px-1">SN</span>
-        {NAV_ITEMS.map((item) => (
-          <Link
-            key={item.title}
-            href={item.link}
-            className="flex flex-col items-center justify-center w-16 h-16 rounded-lg hover:bg-muted transition-colors group"
-          >
-            <item.icon className={`h-5 w-5 ${item.color} group-hover:scale-110 transition-transform`} />
-            <span className="text-[10px] mt-1 text-muted-foreground group-hover:text-foreground">{item.title}</span>
-          </Link>
-        ))}
-        <div className="mt-auto">
-          <Link
-            href="/dashboard"
-            className="flex flex-col items-center justify-center w-16 h-16 rounded-lg hover:bg-muted transition-colors"
-          >
-            <span className="text-[10px] text-muted-foreground">Dashboard</span>
-          </Link>
-        </div>
-      </aside>
-
+    <div className="flex flex-col h-full overflow-hidden">
       {/* Main Content */}
       <main className="flex-1 flex flex-col overflow-hidden">
         {/* Header */}
