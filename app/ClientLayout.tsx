@@ -202,18 +202,25 @@ const ClientLayoutComponent: React.FC<ClientLayoutProps> = ({ children }) => {
                   ))}
                 </aside>
 
-                {/* Main content area with search bar */}
+                {/* Main content area with header and search bar */}
                 <div id="main-content" tabIndex={-1} className="flex-1 flex flex-col overflow-hidden">
-                  {/* Global Search Bar */}
+                  {/* Global Header with Branding and Search */}
                   <div className="h-14 border-b bg-card flex items-center px-4 shrink-0">
-                    <div className="relative w-full max-w-md">
+                    {/* Search Bar - Left */}
+                    <div className="relative w-full max-w-xs">
                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                       <Input
                         type="search"
-                        placeholder="Search styles, customers, orders..."
+                        placeholder="Search..."
                         className="pl-9 w-full"
                       />
                     </div>
+                    {/* Branding - Center */}
+                    <div className="flex-1 flex justify-center">
+                      <h1 className="text-lg font-bold text-primary">Sourcing Ninja</h1>
+                    </div>
+                    {/* Spacer for balance */}
+                    <div className="w-full max-w-xs" />
                   </div>
                   {/* Page content */}
                   <div className="flex-1 overflow-auto">
