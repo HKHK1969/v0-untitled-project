@@ -4,7 +4,8 @@ import { useState, useEffect, useCallback, memo, Suspense, createContext, useCon
 import type React from "react"
 import { Inter } from "next/font/google"
 import Link from "next/link"
-import { Palette, Users, Truck, Package, ClipboardList, FileBox } from "lucide-react"
+import { Palette, Users, Truck, Package, ClipboardList, FileBox, Search } from "lucide-react"
+import { Input } from "@/components/ui/input"
 import { ThemeProvider } from "@/components/theme-provider"
 import { DataRecoveryNotification } from "@/components/data-recovery-notification"
 import { DataPersistenceInitializer } from "@/components/data-persistence-initializer"
@@ -201,9 +202,23 @@ const ClientLayoutComponent: React.FC<ClientLayoutProps> = ({ children }) => {
                   ))}
                 </aside>
 
-                {/* Main content wrapper */}
-                <div id="main-content" tabIndex={-1} className="flex-1 overflow-auto">
-                  {children}
+                {/* Main content area with search bar */}
+                <div id="main-content" tabIndex={-1} className="flex-1 flex flex-col overflow-hidden">
+                  {/* Global Search Bar */}
+                  <div className="h-14 border-b bg-card flex items-center px-4 shrink-0">
+                    <div className="relative w-full max-w-md">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        type="search"
+                        placeholder="Search styles, customers, orders..."
+                        className="pl-9 w-full"
+                      />
+                    </div>
+                  </div>
+                  {/* Page content */}
+                  <div className="flex-1 overflow-auto">
+                    {children}
+                  </div>
                 </div>
               </div>
 
