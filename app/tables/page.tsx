@@ -126,21 +126,6 @@ export default function TablesPage(_props: TablesPageProps) {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="bg-background border-b">
-        <div className="container flex h-16 items-center px-4 md:px-6">
-          <Link href="/" className="text-lg font-semibold">
-            Sourcing Ninja
-          </Link>
-          <nav className="ml-auto flex gap-4 sm:gap-6">
-            <Link href="/dashboard" className="text-sm font-medium hover:underline underline-offset-4">
-              Dashboard
-            </Link>
-            <Link href="/tables" className="text-sm font-medium hover:underline underline-offset-4">
-              Tables
-            </Link>
-          </nav>
-        </div>
-      </header>
       <main className="flex-1 p-4 md:p-6">
         <div className="grid gap-4 md:gap-8">
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">

@@ -32,24 +32,6 @@ const ORDER_TYPES = [
 export default function OrdersPage() {
   return (
     <div className="flex flex-col min-h-screen">
-      <header className="bg-background border-b">
-        <div className="container flex h-16 items-center px-4 md:px-6">
-          <Link href="/" className="text-lg font-semibold">
-            Sourcing Ninja
-          </Link>
-          <nav className="ml-auto flex gap-4 sm:gap-6">
-            <Link href="/dashboard" className="text-sm font-medium hover:underline underline-offset-4">
-              Dashboard
-            </Link>
-            <Link href="/tables" className="text-sm font-medium hover:underline underline-offset-4">
-              Tables
-            </Link>
-            <Link href="/analytics" className="text-sm font-medium hover:underline underline-offset-4">
-              Analytics
-            </Link>
-          </nav>
-        </div>
-      </header>
       <main className="flex-1 p-4 md:p-6">
         <div className="mx-auto max-w-4xl space-y-6">
           <div className="flex items-center">
@@ -97,13 +79,6 @@ export default function OrdersPage() {
           </div>
         </div>
       </main>
-      <footer className="border-t py-6 md:py-0">
-        <div className="container flex flex-col items-center justify-between gap-4 md:h-16 md:flex-row">
-          <p className="text-sm text-muted-foreground">
-            &copy; {new Date().getFullYear()} Sourcing Ninja. All rights reserved.
-          </p>
-        </div>
-      </footer>
     </div>
   )
 }

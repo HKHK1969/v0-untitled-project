@@ -24,17 +24,10 @@ const URGENT_ITEMS = {
 }
 
 export default function Home() {
-  const appName = "Sourcing Ninja"
-
   return (
     <div className="flex flex-col h-full overflow-hidden">
       {/* Main Content */}
       <main className="flex-1 flex flex-col overflow-hidden">
-        {/* Header */}
-        <header className="h-12 border-b flex items-center px-4 shrink-0">
-          <span className="text-lg font-semibold">{appName}</span>
-          <span className="ml-4 text-sm text-muted-foreground">Supply Chain Tracker</span>
-        </header>
 
         {/* Urgent Items Grid - fills remaining space */}
         <div className="flex-1 p-4 grid grid-cols-4 gap-3 overflow-hidden">
@@ -126,12 +119,7 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Footer */}
-        <footer className="h-8 border-t flex items-center justify-center shrink-0">
-          <p className="text-xs text-muted-foreground">
-            &copy; {new Date().getFullYear()} {appName}
-          </p>
-        </footer>
+
       </main>
     </div>
   )
