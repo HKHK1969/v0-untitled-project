@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, memo, Suspense, createContext, useCon
 import type React from "react"
 import { Inter } from "next/font/google"
 import Link from "next/link"
-import { Palette, Users, Truck, Package, ClipboardList, FileBox, Search } from "lucide-react"
+import { Palette, Users, Truck, Package, ClipboardList, FileBox, Search, Receipt } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { ThemeProvider } from "@/components/theme-provider"
 import { DataRecoveryNotification } from "@/components/data-recovery-notification"
@@ -22,6 +22,7 @@ const NAV_ITEMS = [
   { title: "Suppliers", icon: Truck, link: "/tables/suppliers", color: "text-green-600" },
   { title: "Bulk Orders", icon: FileBox, link: "/tables/productionOrders", color: "text-orange-600" },
   { title: "Samples", icon: Package, link: "/tables/sampleOrders", color: "text-cyan-600" },
+  { title: "Invoicing", icon: Receipt, link: "/tables/invoicing", color: "text-emerald-600" },
   { title: "Tasks", icon: ClipboardList, link: "/tables/tasks", color: "text-red-600" },
 ]
 
